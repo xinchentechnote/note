@@ -39,6 +39,11 @@ module:
     - source: assets/images
       target: static/images  # 关键配置
 
+markup:
+  goldmark:
+    renderer:
+      unsafe: true
+
 permalinks:
     post: /p/:slug/
     page: /:slug/

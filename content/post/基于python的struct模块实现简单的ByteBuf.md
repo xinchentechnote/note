@@ -245,6 +245,8 @@ class Buf(metaclass=abc.ABCMeta):
 
 ByteBuf底层使用可以字节数组bytearray作存储，记录分别读写的位置。
 ![描述文字](/note/images/pasted-image-20220405221730.png)
+![xxx]({{ "/images/pasted-image-20220405221730.png" | relURL }})
+
 ```
 import abc  
 import struct  
