@@ -1,4 +1,1541 @@
-<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>歆晨技术笔记</title><link>https://xinchentechnote.github.io/note/</link><description>Recent content on 歆晨技术笔记</description><generator>Hugo -- gohugo.io</generator><language>zh-cn</language><copyright>xinchen</copyright><lastBuildDate>Sun, 11 May 2025 10:29:30 +0800</lastBuildDate><atom:link href="https://xinchentechnote.github.io/note/index.xml" rel="self" type="application/rss+xml"/><item><title>Java 字符串拼接性能实测：基于 JMH 的微基准测试</title><link>https://xinchentechnote.github.io/note/p/java-%E5%AD%97%E7%AC%A6%E4%B8%B2%E6%8B%BC%E6%8E%A5%E6%80%A7%E8%83%BD%E5%AE%9E%E6%B5%8B%E5%9F%BA%E4%BA%8E-jmh-%E7%9A%84%E5%BE%AE%E5%9F%BA%E5%87%86%E6%B5%8B%E8%AF%95/</link><pubDate>Sun, 11 May 2025 10:29:30 +0800</pubDate><guid>https://xinchentechnote.github.io/note/p/java-%E5%AD%97%E7%AC%A6%E4%B8%B2%E6%8B%BC%E6%8E%A5%E6%80%A7%E8%83%BD%E5%AE%9E%E6%B5%8B%E5%9F%BA%E4%BA%8E-jmh-%E7%9A%84%E5%BE%AE%E5%9F%BA%E5%87%86%E6%B5%8B%E8%AF%95/</guid><description>&lt;h1 id="java-字符串拼接性能实测基于-jmh-的微基准测试">Java 字符串拼接性能实测：基于 JMH 的微基准测试
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>歆晨技术笔记</title><link>https://xinchentechnote.github.io/note/</link><description>Recent content on 歆晨技术笔记</description><generator>Hugo -- gohugo.io</generator><language>zh-cn</language><copyright>xinchen</copyright><lastBuildDate>Sun, 11 May 2025 18:29:30 +0800</lastBuildDate><atom:link href="https://xinchentechnote.github.io/note/index.xml" rel="self" type="application/rss+xml"/><item><title>基于python的struct模块实现简单的ByteBuf</title><link>https://xinchentechnote.github.io/note/p/%E5%9F%BA%E4%BA%8Epython%E7%9A%84struct%E6%A8%A1%E5%9D%97%E5%AE%9E%E7%8E%B0%E7%AE%80%E5%8D%95%E7%9A%84bytebuf/</link><pubDate>Sun, 11 May 2025 18:29:30 +0800</pubDate><guid>https://xinchentechnote.github.io/note/p/%E5%9F%BA%E4%BA%8Epython%E7%9A%84struct%E6%A8%A1%E5%9D%97%E5%AE%9E%E7%8E%B0%E7%AE%80%E5%8D%95%E7%9A%84bytebuf/</guid><description>&lt;h1 id="基于python的struct模块实现简单的bytebuf">基于python的struct模块实现简单的ByteBuf
+&lt;/h1>&lt;h3 id="写在前面">&lt;strong>写在前面&lt;/strong>
+&lt;/h3>&lt;p>在网络编程中需要将消息序列化为二进制序列打包传输。python标准库中的struct模块提供了pack、unpack等函数将基本数据类型转换为对应的bytes数组。使用pack、unpack需要在传参是需要关注字节序（大小端）、格式等，其中字节序有@、=、&amp;lt;、&amp;gt;、！五种，格式约21种，使用成本相对高。所以参考Netty的ByteBuf及Rust的bytes库中的Buf、BufMut为Python简单封装一个类似的ByteBuf。&lt;/p>
+&lt;p>netty中ByteBuf的基本结构如下：&lt;/p>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt">1
+&lt;/span>&lt;span class="lnt">2
+&lt;/span>&lt;span class="lnt">3
+&lt;/span>&lt;span class="lnt">4
+&lt;/span>&lt;span class="lnt">5
+&lt;/span>&lt;span class="lnt">6
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-fallback" data-lang="fallback">&lt;span class="line">&lt;span class="cl"> +-------------------+------------------+------------------+
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> | discardable bytes | readable bytes | writable bytes |
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> | | (CONTENT) | |
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> +-------------------+------------------+------------------+
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> | | | |
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> 0 &amp;lt;= readerIndex &amp;lt;= writerIndex &amp;lt;= capacity
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;h3 id="一buf接口设计">&lt;strong>一、Buf接口设计&lt;/strong>
+&lt;/h3>&lt;p>&lt;img src="https://xinchentechnote.github.io/note/images/pasted-image-20220405221600.png"
+loading="lazy"
+alt="描述文字"
+>&lt;/p>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt"> 1
+&lt;/span>&lt;span class="lnt"> 2
+&lt;/span>&lt;span class="lnt"> 3
+&lt;/span>&lt;span class="lnt"> 4
+&lt;/span>&lt;span class="lnt"> 5
+&lt;/span>&lt;span class="lnt"> 6
+&lt;/span>&lt;span class="lnt"> 7
+&lt;/span>&lt;span class="lnt"> 8
+&lt;/span>&lt;span class="lnt"> 9
+&lt;/span>&lt;span class="lnt"> 10
+&lt;/span>&lt;span class="lnt"> 11
+&lt;/span>&lt;span class="lnt"> 12
+&lt;/span>&lt;span class="lnt"> 13
+&lt;/span>&lt;span class="lnt"> 14
+&lt;/span>&lt;span class="lnt"> 15
+&lt;/span>&lt;span class="lnt"> 16
+&lt;/span>&lt;span class="lnt"> 17
+&lt;/span>&lt;span class="lnt"> 18
+&lt;/span>&lt;span class="lnt"> 19
+&lt;/span>&lt;span class="lnt"> 20
+&lt;/span>&lt;span class="lnt"> 21
+&lt;/span>&lt;span class="lnt"> 22
+&lt;/span>&lt;span class="lnt"> 23
+&lt;/span>&lt;span class="lnt"> 24
+&lt;/span>&lt;span class="lnt"> 25
+&lt;/span>&lt;span class="lnt"> 26
+&lt;/span>&lt;span class="lnt"> 27
+&lt;/span>&lt;span class="lnt"> 28
+&lt;/span>&lt;span class="lnt"> 29
+&lt;/span>&lt;span class="lnt"> 30
+&lt;/span>&lt;span class="lnt"> 31
+&lt;/span>&lt;span class="lnt"> 32
+&lt;/span>&lt;span class="lnt"> 33
+&lt;/span>&lt;span class="lnt"> 34
+&lt;/span>&lt;span class="lnt"> 35
+&lt;/span>&lt;span class="lnt"> 36
+&lt;/span>&lt;span class="lnt"> 37
+&lt;/span>&lt;span class="lnt"> 38
+&lt;/span>&lt;span class="lnt"> 39
+&lt;/span>&lt;span class="lnt"> 40
+&lt;/span>&lt;span class="lnt"> 41
+&lt;/span>&lt;span class="lnt"> 42
+&lt;/span>&lt;span class="lnt"> 43
+&lt;/span>&lt;span class="lnt"> 44
+&lt;/span>&lt;span class="lnt"> 45
+&lt;/span>&lt;span class="lnt"> 46
+&lt;/span>&lt;span class="lnt"> 47
+&lt;/span>&lt;span class="lnt"> 48
+&lt;/span>&lt;span class="lnt"> 49
+&lt;/span>&lt;span class="lnt"> 50
+&lt;/span>&lt;span class="lnt"> 51
+&lt;/span>&lt;span class="lnt"> 52
+&lt;/span>&lt;span class="lnt"> 53
+&lt;/span>&lt;span class="lnt"> 54
+&lt;/span>&lt;span class="lnt"> 55
+&lt;/span>&lt;span class="lnt"> 56
+&lt;/span>&lt;span class="lnt"> 57
+&lt;/span>&lt;span class="lnt"> 58
+&lt;/span>&lt;span class="lnt"> 59
+&lt;/span>&lt;span class="lnt"> 60
+&lt;/span>&lt;span class="lnt"> 61
+&lt;/span>&lt;span class="lnt"> 62
+&lt;/span>&lt;span class="lnt"> 63
+&lt;/span>&lt;span class="lnt"> 64
+&lt;/span>&lt;span class="lnt"> 65
+&lt;/span>&lt;span class="lnt"> 66
+&lt;/span>&lt;span class="lnt"> 67
+&lt;/span>&lt;span class="lnt"> 68
+&lt;/span>&lt;span class="lnt"> 69
+&lt;/span>&lt;span class="lnt"> 70
+&lt;/span>&lt;span class="lnt"> 71
+&lt;/span>&lt;span class="lnt"> 72
+&lt;/span>&lt;span class="lnt"> 73
+&lt;/span>&lt;span class="lnt"> 74
+&lt;/span>&lt;span class="lnt"> 75
+&lt;/span>&lt;span class="lnt"> 76
+&lt;/span>&lt;span class="lnt"> 77
+&lt;/span>&lt;span class="lnt"> 78
+&lt;/span>&lt;span class="lnt"> 79
+&lt;/span>&lt;span class="lnt"> 80
+&lt;/span>&lt;span class="lnt"> 81
+&lt;/span>&lt;span class="lnt"> 82
+&lt;/span>&lt;span class="lnt"> 83
+&lt;/span>&lt;span class="lnt"> 84
+&lt;/span>&lt;span class="lnt"> 85
+&lt;/span>&lt;span class="lnt"> 86
+&lt;/span>&lt;span class="lnt"> 87
+&lt;/span>&lt;span class="lnt"> 88
+&lt;/span>&lt;span class="lnt"> 89
+&lt;/span>&lt;span class="lnt"> 90
+&lt;/span>&lt;span class="lnt"> 91
+&lt;/span>&lt;span class="lnt"> 92
+&lt;/span>&lt;span class="lnt"> 93
+&lt;/span>&lt;span class="lnt"> 94
+&lt;/span>&lt;span class="lnt"> 95
+&lt;/span>&lt;span class="lnt"> 96
+&lt;/span>&lt;span class="lnt"> 97
+&lt;/span>&lt;span class="lnt"> 98
+&lt;/span>&lt;span class="lnt"> 99
+&lt;/span>&lt;span class="lnt">100
+&lt;/span>&lt;span class="lnt">101
+&lt;/span>&lt;span class="lnt">102
+&lt;/span>&lt;span class="lnt">103
+&lt;/span>&lt;span class="lnt">104
+&lt;/span>&lt;span class="lnt">105
+&lt;/span>&lt;span class="lnt">106
+&lt;/span>&lt;span class="lnt">107
+&lt;/span>&lt;span class="lnt">108
+&lt;/span>&lt;span class="lnt">109
+&lt;/span>&lt;span class="lnt">110
+&lt;/span>&lt;span class="lnt">111
+&lt;/span>&lt;span class="lnt">112
+&lt;/span>&lt;span class="lnt">113
+&lt;/span>&lt;span class="lnt">114
+&lt;/span>&lt;span class="lnt">115
+&lt;/span>&lt;span class="lnt">116
+&lt;/span>&lt;span class="lnt">117
+&lt;/span>&lt;span class="lnt">118
+&lt;/span>&lt;span class="lnt">119
+&lt;/span>&lt;span class="lnt">120
+&lt;/span>&lt;span class="lnt">121
+&lt;/span>&lt;span class="lnt">122
+&lt;/span>&lt;span class="lnt">123
+&lt;/span>&lt;span class="lnt">124
+&lt;/span>&lt;span class="lnt">125
+&lt;/span>&lt;span class="lnt">126
+&lt;/span>&lt;span class="lnt">127
+&lt;/span>&lt;span class="lnt">128
+&lt;/span>&lt;span class="lnt">129
+&lt;/span>&lt;span class="lnt">130
+&lt;/span>&lt;span class="lnt">131
+&lt;/span>&lt;span class="lnt">132
+&lt;/span>&lt;span class="lnt">133
+&lt;/span>&lt;span class="lnt">134
+&lt;/span>&lt;span class="lnt">135
+&lt;/span>&lt;span class="lnt">136
+&lt;/span>&lt;span class="lnt">137
+&lt;/span>&lt;span class="lnt">138
+&lt;/span>&lt;span class="lnt">139
+&lt;/span>&lt;span class="lnt">140
+&lt;/span>&lt;span class="lnt">141
+&lt;/span>&lt;span class="lnt">142
+&lt;/span>&lt;span class="lnt">143
+&lt;/span>&lt;span class="lnt">144
+&lt;/span>&lt;span class="lnt">145
+&lt;/span>&lt;span class="lnt">146
+&lt;/span>&lt;span class="lnt">147
+&lt;/span>&lt;span class="lnt">148
+&lt;/span>&lt;span class="lnt">149
+&lt;/span>&lt;span class="lnt">150
+&lt;/span>&lt;span class="lnt">151
+&lt;/span>&lt;span class="lnt">152
+&lt;/span>&lt;span class="lnt">153
+&lt;/span>&lt;span class="lnt">154
+&lt;/span>&lt;span class="lnt">155
+&lt;/span>&lt;span class="lnt">156
+&lt;/span>&lt;span class="lnt">157
+&lt;/span>&lt;span class="lnt">158
+&lt;/span>&lt;span class="lnt">159
+&lt;/span>&lt;span class="lnt">160
+&lt;/span>&lt;span class="lnt">161
+&lt;/span>&lt;span class="lnt">162
+&lt;/span>&lt;span class="lnt">163
+&lt;/span>&lt;span class="lnt">164
+&lt;/span>&lt;span class="lnt">165
+&lt;/span>&lt;span class="lnt">166
+&lt;/span>&lt;span class="lnt">167
+&lt;/span>&lt;span class="lnt">168
+&lt;/span>&lt;span class="lnt">169
+&lt;/span>&lt;span class="lnt">170
+&lt;/span>&lt;span class="lnt">171
+&lt;/span>&lt;span class="lnt">172
+&lt;/span>&lt;span class="lnt">173
+&lt;/span>&lt;span class="lnt">174
+&lt;/span>&lt;span class="lnt">175
+&lt;/span>&lt;span class="lnt">176
+&lt;/span>&lt;span class="lnt">177
+&lt;/span>&lt;span class="lnt">178
+&lt;/span>&lt;span class="lnt">179
+&lt;/span>&lt;span class="lnt">180
+&lt;/span>&lt;span class="lnt">181
+&lt;/span>&lt;span class="lnt">182
+&lt;/span>&lt;span class="lnt">183
+&lt;/span>&lt;span class="lnt">184
+&lt;/span>&lt;span class="lnt">185
+&lt;/span>&lt;span class="lnt">186
+&lt;/span>&lt;span class="lnt">187
+&lt;/span>&lt;span class="lnt">188
+&lt;/span>&lt;span class="lnt">189
+&lt;/span>&lt;span class="lnt">190
+&lt;/span>&lt;span class="lnt">191
+&lt;/span>&lt;span class="lnt">192
+&lt;/span>&lt;span class="lnt">193
+&lt;/span>&lt;span class="lnt">194
+&lt;/span>&lt;span class="lnt">195
+&lt;/span>&lt;span class="lnt">196
+&lt;/span>&lt;span class="lnt">197
+&lt;/span>&lt;span class="lnt">198
+&lt;/span>&lt;span class="lnt">199
+&lt;/span>&lt;span class="lnt">200
+&lt;/span>&lt;span class="lnt">201
+&lt;/span>&lt;span class="lnt">202
+&lt;/span>&lt;span class="lnt">203
+&lt;/span>&lt;span class="lnt">204
+&lt;/span>&lt;span class="lnt">205
+&lt;/span>&lt;span class="lnt">206
+&lt;/span>&lt;span class="lnt">207
+&lt;/span>&lt;span class="lnt">208
+&lt;/span>&lt;span class="lnt">209
+&lt;/span>&lt;span class="lnt">210
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-fallback" data-lang="fallback">&lt;span class="line">&lt;span class="cl">import abc
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">import struct
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">from numpy import longlong
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&amp;#34;&amp;#34;&amp;#34;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">https://netty.io/4.0/api/io/netty/buffer/ByteBuf.html
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">https://docs.oracle.com/javase/8/docs/api/java/nio/ByteBuffer.html
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">https://docs.rs/bytes/1.1.0/bytes/
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&amp;#34;&amp;#34;&amp;#34;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">class Buf(metaclass=abc.ABCMeta):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> class ByteOrder:
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> NATIVE = &amp;#39;@&amp;#39;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> STD_NATIVE = &amp;#39;=&amp;#39;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> LITTLE_ENDIAN = &amp;#39;&amp;lt;&amp;#39;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> BIG_ENDIAN = &amp;#39;&amp;gt;&amp;#39;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> NETWORK = &amp;#39;!&amp;#39;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> PAD_BYTE = &amp;#39;x&amp;#39;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> CHAR = &amp;#39;c&amp;#39;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> SIGNED_CHAR = &amp;#39;b&amp;#39;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> UNSIGNED_CHAR = &amp;#39;B&amp;#39;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> BOOLEAN = &amp;#39;?&amp;#39;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> SHORT = &amp;#39;h&amp;#39;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> UNSIGNED_SHORT = &amp;#39;H&amp;#39;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> INT = &amp;#39;i&amp;#39;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> UNSIGNED_INT = &amp;#39;I&amp;#39;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> LONG = &amp;#39;l&amp;#39;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> UNSIGNED_LONG = &amp;#39;L&amp;#39;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> LONG_LONG = &amp;#39;q&amp;#39;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> UNSIGNED_LONG_LONG = &amp;#39;Q&amp;#39;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> SSIZE_T = &amp;#39;n&amp;#39;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> SIZE_T = &amp;#39;N&amp;#39;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> EXPONENT = &amp;#39;e&amp;#39;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> FLOAT = &amp;#39;f&amp;#39;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> DOUBLE = &amp;#39;d&amp;#39;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> CHAR_ARR = &amp;#39;s&amp;#39;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> CHAR_ARR1 = &amp;#39;p&amp;#39;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> VOID = &amp;#39;P&amp;#39;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> @abc.abstractmethod
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def readable_bytes_len(self) -&amp;gt; int:
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> pass
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> @abc.abstractmethod
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def to_bytes(self) -&amp;gt; bytearray:
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> pass
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> @abc.abstractmethod
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def write_i8(self, value: int):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> pass
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> @abc.abstractmethod
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def write_u8(self, value: int):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> pass
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> @abc.abstractmethod
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def write_bool(self, value: bool):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> pass
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> @abc.abstractmethod
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def write_i16(self, value: int):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> pass
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> @abc.abstractmethod
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def write_i16_le(self, value: int):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> pass
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> @abc.abstractmethod
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def write_u16(self, value: int):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> pass
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> @abc.abstractmethod
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def write_u16_le(self, value: int):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> pass
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> @abc.abstractmethod
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def write_i32(self, value: int):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> pass
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> @abc.abstractmethod
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def write_i32_le(self, value: int):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> pass
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> @abc.abstractmethod
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def write_u32(self, value: int):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> pass
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> @abc.abstractmethod
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def write_u32_le(self, value: int):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> pass
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> @abc.abstractmethod
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def write_i64(self, value: longlong):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> pass
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> @abc.abstractmethod
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def write_i64_le(self, value: longlong):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> pass
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> @abc.abstractmethod
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def write_u64(self, value: longlong):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> pass
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> @abc.abstractmethod
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def write_u64_le(self, value: longlong):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> pass
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> @abc.abstractmethod
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def write_f32(self, value: float):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> pass
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> @abc.abstractmethod
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def write_f32_le(self, value: float):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> pass
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> @abc.abstractmethod
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def write_f64(self, value: float):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> pass
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> @abc.abstractmethod
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def write_f64_le(self, value: float):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> pass
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> @abc.abstractmethod
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def write_bytes(self, value: bytes):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> pass
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> @abc.abstractmethod
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def read_i8(self):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> pass
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> @abc.abstractmethod
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def read_u8(self):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> pass
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> @abc.abstractmethod
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def read_bool(self):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> pass
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> @abc.abstractmethod
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def read_i16(self):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> pass
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> @abc.abstractmethod
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def read_i16_le(self):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> pass
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> @abc.abstractmethod
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def read_u16(self):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> pass
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> @abc.abstractmethod
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def read_u16_le(self):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> pass
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> @abc.abstractmethod
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def read_i32(self):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> pass
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> @abc.abstractmethod
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def read_i32_le(self):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> pass
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> @abc.abstractmethod
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def read_u32(self):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> pass
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> @abc.abstractmethod
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def read_u32_le(self):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> pass
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> @abc.abstractmethod
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def read_i64(self):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> pass
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> @abc.abstractmethod
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def read_i64_le(self):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> pass
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> @abc.abstractmethod
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def read_u64(self):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> pass
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> @abc.abstractmethod
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def read_u64_le(self):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> pass
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> @abc.abstractmethod
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def read_f32(self):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> pass
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> @abc.abstractmethod
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def read_f32_le(self):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> pass
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> @abc.abstractmethod
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def read_f64(self):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> pass
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> @abc.abstractmethod
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def read_f64_le(self):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> pass
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> @abc.abstractmethod
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def read_bytes(self, length: int) -&amp;gt; bytes:
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> pass
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;h3 id="二bytebuf具体实现">&lt;strong>二、ByteBuf具体实现&lt;/strong>
+&lt;/h3>&lt;p>ByteBuf底层使用可以字节数组bytearray作存储，记录分别读写的位置。
+&lt;img src="https://xinchentechnote.github.io/note/images/pasted-image-20220405221730.png"
+loading="lazy"
+alt="描述文字"
+>&lt;/p>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt"> 1
+&lt;/span>&lt;span class="lnt"> 2
+&lt;/span>&lt;span class="lnt"> 3
+&lt;/span>&lt;span class="lnt"> 4
+&lt;/span>&lt;span class="lnt"> 5
+&lt;/span>&lt;span class="lnt"> 6
+&lt;/span>&lt;span class="lnt"> 7
+&lt;/span>&lt;span class="lnt"> 8
+&lt;/span>&lt;span class="lnt"> 9
+&lt;/span>&lt;span class="lnt"> 10
+&lt;/span>&lt;span class="lnt"> 11
+&lt;/span>&lt;span class="lnt"> 12
+&lt;/span>&lt;span class="lnt"> 13
+&lt;/span>&lt;span class="lnt"> 14
+&lt;/span>&lt;span class="lnt"> 15
+&lt;/span>&lt;span class="lnt"> 16
+&lt;/span>&lt;span class="lnt"> 17
+&lt;/span>&lt;span class="lnt"> 18
+&lt;/span>&lt;span class="lnt"> 19
+&lt;/span>&lt;span class="lnt"> 20
+&lt;/span>&lt;span class="lnt"> 21
+&lt;/span>&lt;span class="lnt"> 22
+&lt;/span>&lt;span class="lnt"> 23
+&lt;/span>&lt;span class="lnt"> 24
+&lt;/span>&lt;span class="lnt"> 25
+&lt;/span>&lt;span class="lnt"> 26
+&lt;/span>&lt;span class="lnt"> 27
+&lt;/span>&lt;span class="lnt"> 28
+&lt;/span>&lt;span class="lnt"> 29
+&lt;/span>&lt;span class="lnt"> 30
+&lt;/span>&lt;span class="lnt"> 31
+&lt;/span>&lt;span class="lnt"> 32
+&lt;/span>&lt;span class="lnt"> 33
+&lt;/span>&lt;span class="lnt"> 34
+&lt;/span>&lt;span class="lnt"> 35
+&lt;/span>&lt;span class="lnt"> 36
+&lt;/span>&lt;span class="lnt"> 37
+&lt;/span>&lt;span class="lnt"> 38
+&lt;/span>&lt;span class="lnt"> 39
+&lt;/span>&lt;span class="lnt"> 40
+&lt;/span>&lt;span class="lnt"> 41
+&lt;/span>&lt;span class="lnt"> 42
+&lt;/span>&lt;span class="lnt"> 43
+&lt;/span>&lt;span class="lnt"> 44
+&lt;/span>&lt;span class="lnt"> 45
+&lt;/span>&lt;span class="lnt"> 46
+&lt;/span>&lt;span class="lnt"> 47
+&lt;/span>&lt;span class="lnt"> 48
+&lt;/span>&lt;span class="lnt"> 49
+&lt;/span>&lt;span class="lnt"> 50
+&lt;/span>&lt;span class="lnt"> 51
+&lt;/span>&lt;span class="lnt"> 52
+&lt;/span>&lt;span class="lnt"> 53
+&lt;/span>&lt;span class="lnt"> 54
+&lt;/span>&lt;span class="lnt"> 55
+&lt;/span>&lt;span class="lnt"> 56
+&lt;/span>&lt;span class="lnt"> 57
+&lt;/span>&lt;span class="lnt"> 58
+&lt;/span>&lt;span class="lnt"> 59
+&lt;/span>&lt;span class="lnt"> 60
+&lt;/span>&lt;span class="lnt"> 61
+&lt;/span>&lt;span class="lnt"> 62
+&lt;/span>&lt;span class="lnt"> 63
+&lt;/span>&lt;span class="lnt"> 64
+&lt;/span>&lt;span class="lnt"> 65
+&lt;/span>&lt;span class="lnt"> 66
+&lt;/span>&lt;span class="lnt"> 67
+&lt;/span>&lt;span class="lnt"> 68
+&lt;/span>&lt;span class="lnt"> 69
+&lt;/span>&lt;span class="lnt"> 70
+&lt;/span>&lt;span class="lnt"> 71
+&lt;/span>&lt;span class="lnt"> 72
+&lt;/span>&lt;span class="lnt"> 73
+&lt;/span>&lt;span class="lnt"> 74
+&lt;/span>&lt;span class="lnt"> 75
+&lt;/span>&lt;span class="lnt"> 76
+&lt;/span>&lt;span class="lnt"> 77
+&lt;/span>&lt;span class="lnt"> 78
+&lt;/span>&lt;span class="lnt"> 79
+&lt;/span>&lt;span class="lnt"> 80
+&lt;/span>&lt;span class="lnt"> 81
+&lt;/span>&lt;span class="lnt"> 82
+&lt;/span>&lt;span class="lnt"> 83
+&lt;/span>&lt;span class="lnt"> 84
+&lt;/span>&lt;span class="lnt"> 85
+&lt;/span>&lt;span class="lnt"> 86
+&lt;/span>&lt;span class="lnt"> 87
+&lt;/span>&lt;span class="lnt"> 88
+&lt;/span>&lt;span class="lnt"> 89
+&lt;/span>&lt;span class="lnt"> 90
+&lt;/span>&lt;span class="lnt"> 91
+&lt;/span>&lt;span class="lnt"> 92
+&lt;/span>&lt;span class="lnt"> 93
+&lt;/span>&lt;span class="lnt"> 94
+&lt;/span>&lt;span class="lnt"> 95
+&lt;/span>&lt;span class="lnt"> 96
+&lt;/span>&lt;span class="lnt"> 97
+&lt;/span>&lt;span class="lnt"> 98
+&lt;/span>&lt;span class="lnt"> 99
+&lt;/span>&lt;span class="lnt">100
+&lt;/span>&lt;span class="lnt">101
+&lt;/span>&lt;span class="lnt">102
+&lt;/span>&lt;span class="lnt">103
+&lt;/span>&lt;span class="lnt">104
+&lt;/span>&lt;span class="lnt">105
+&lt;/span>&lt;span class="lnt">106
+&lt;/span>&lt;span class="lnt">107
+&lt;/span>&lt;span class="lnt">108
+&lt;/span>&lt;span class="lnt">109
+&lt;/span>&lt;span class="lnt">110
+&lt;/span>&lt;span class="lnt">111
+&lt;/span>&lt;span class="lnt">112
+&lt;/span>&lt;span class="lnt">113
+&lt;/span>&lt;span class="lnt">114
+&lt;/span>&lt;span class="lnt">115
+&lt;/span>&lt;span class="lnt">116
+&lt;/span>&lt;span class="lnt">117
+&lt;/span>&lt;span class="lnt">118
+&lt;/span>&lt;span class="lnt">119
+&lt;/span>&lt;span class="lnt">120
+&lt;/span>&lt;span class="lnt">121
+&lt;/span>&lt;span class="lnt">122
+&lt;/span>&lt;span class="lnt">123
+&lt;/span>&lt;span class="lnt">124
+&lt;/span>&lt;span class="lnt">125
+&lt;/span>&lt;span class="lnt">126
+&lt;/span>&lt;span class="lnt">127
+&lt;/span>&lt;span class="lnt">128
+&lt;/span>&lt;span class="lnt">129
+&lt;/span>&lt;span class="lnt">130
+&lt;/span>&lt;span class="lnt">131
+&lt;/span>&lt;span class="lnt">132
+&lt;/span>&lt;span class="lnt">133
+&lt;/span>&lt;span class="lnt">134
+&lt;/span>&lt;span class="lnt">135
+&lt;/span>&lt;span class="lnt">136
+&lt;/span>&lt;span class="lnt">137
+&lt;/span>&lt;span class="lnt">138
+&lt;/span>&lt;span class="lnt">139
+&lt;/span>&lt;span class="lnt">140
+&lt;/span>&lt;span class="lnt">141
+&lt;/span>&lt;span class="lnt">142
+&lt;/span>&lt;span class="lnt">143
+&lt;/span>&lt;span class="lnt">144
+&lt;/span>&lt;span class="lnt">145
+&lt;/span>&lt;span class="lnt">146
+&lt;/span>&lt;span class="lnt">147
+&lt;/span>&lt;span class="lnt">148
+&lt;/span>&lt;span class="lnt">149
+&lt;/span>&lt;span class="lnt">150
+&lt;/span>&lt;span class="lnt">151
+&lt;/span>&lt;span class="lnt">152
+&lt;/span>&lt;span class="lnt">153
+&lt;/span>&lt;span class="lnt">154
+&lt;/span>&lt;span class="lnt">155
+&lt;/span>&lt;span class="lnt">156
+&lt;/span>&lt;span class="lnt">157
+&lt;/span>&lt;span class="lnt">158
+&lt;/span>&lt;span class="lnt">159
+&lt;/span>&lt;span class="lnt">160
+&lt;/span>&lt;span class="lnt">161
+&lt;/span>&lt;span class="lnt">162
+&lt;/span>&lt;span class="lnt">163
+&lt;/span>&lt;span class="lnt">164
+&lt;/span>&lt;span class="lnt">165
+&lt;/span>&lt;span class="lnt">166
+&lt;/span>&lt;span class="lnt">167
+&lt;/span>&lt;span class="lnt">168
+&lt;/span>&lt;span class="lnt">169
+&lt;/span>&lt;span class="lnt">170
+&lt;/span>&lt;span class="lnt">171
+&lt;/span>&lt;span class="lnt">172
+&lt;/span>&lt;span class="lnt">173
+&lt;/span>&lt;span class="lnt">174
+&lt;/span>&lt;span class="lnt">175
+&lt;/span>&lt;span class="lnt">176
+&lt;/span>&lt;span class="lnt">177
+&lt;/span>&lt;span class="lnt">178
+&lt;/span>&lt;span class="lnt">179
+&lt;/span>&lt;span class="lnt">180
+&lt;/span>&lt;span class="lnt">181
+&lt;/span>&lt;span class="lnt">182
+&lt;/span>&lt;span class="lnt">183
+&lt;/span>&lt;span class="lnt">184
+&lt;/span>&lt;span class="lnt">185
+&lt;/span>&lt;span class="lnt">186
+&lt;/span>&lt;span class="lnt">187
+&lt;/span>&lt;span class="lnt">188
+&lt;/span>&lt;span class="lnt">189
+&lt;/span>&lt;span class="lnt">190
+&lt;/span>&lt;span class="lnt">191
+&lt;/span>&lt;span class="lnt">192
+&lt;/span>&lt;span class="lnt">193
+&lt;/span>&lt;span class="lnt">194
+&lt;/span>&lt;span class="lnt">195
+&lt;/span>&lt;span class="lnt">196
+&lt;/span>&lt;span class="lnt">197
+&lt;/span>&lt;span class="lnt">198
+&lt;/span>&lt;span class="lnt">199
+&lt;/span>&lt;span class="lnt">200
+&lt;/span>&lt;span class="lnt">201
+&lt;/span>&lt;span class="lnt">202
+&lt;/span>&lt;span class="lnt">203
+&lt;/span>&lt;span class="lnt">204
+&lt;/span>&lt;span class="lnt">205
+&lt;/span>&lt;span class="lnt">206
+&lt;/span>&lt;span class="lnt">207
+&lt;/span>&lt;span class="lnt">208
+&lt;/span>&lt;span class="lnt">209
+&lt;/span>&lt;span class="lnt">210
+&lt;/span>&lt;span class="lnt">211
+&lt;/span>&lt;span class="lnt">212
+&lt;/span>&lt;span class="lnt">213
+&lt;/span>&lt;span class="lnt">214
+&lt;/span>&lt;span class="lnt">215
+&lt;/span>&lt;span class="lnt">216
+&lt;/span>&lt;span class="lnt">217
+&lt;/span>&lt;span class="lnt">218
+&lt;/span>&lt;span class="lnt">219
+&lt;/span>&lt;span class="lnt">220
+&lt;/span>&lt;span class="lnt">221
+&lt;/span>&lt;span class="lnt">222
+&lt;/span>&lt;span class="lnt">223
+&lt;/span>&lt;span class="lnt">224
+&lt;/span>&lt;span class="lnt">225
+&lt;/span>&lt;span class="lnt">226
+&lt;/span>&lt;span class="lnt">227
+&lt;/span>&lt;span class="lnt">228
+&lt;/span>&lt;span class="lnt">229
+&lt;/span>&lt;span class="lnt">230
+&lt;/span>&lt;span class="lnt">231
+&lt;/span>&lt;span class="lnt">232
+&lt;/span>&lt;span class="lnt">233
+&lt;/span>&lt;span class="lnt">234
+&lt;/span>&lt;span class="lnt">235
+&lt;/span>&lt;span class="lnt">236
+&lt;/span>&lt;span class="lnt">237
+&lt;/span>&lt;span class="lnt">238
+&lt;/span>&lt;span class="lnt">239
+&lt;/span>&lt;span class="lnt">240
+&lt;/span>&lt;span class="lnt">241
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-fallback" data-lang="fallback">&lt;span class="line">&lt;span class="cl">import abc
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">import struct
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">from numpy import longlong
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">class ByteBuf(Buf):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def __init__(self, buf: bytearray = None) -&amp;gt; None:
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> if buf is None:
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf = bytearray()
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.write_index = 0
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> else:
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf = buf
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.write_index = len(buf)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.read_index = 0
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def check_readable_bytes_len(self, length: int):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> if self.readable_bytes_len() &amp;lt; length:
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> raise Exception(&amp;#34;readable bytes length must greater than or equal %d&amp;#34; % length)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def readable_bytes_len(self) -&amp;gt; int:
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> return self.write_index - self.read_index
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def to_bytes(self) -&amp;gt; bytearray:
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> return self.buf
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def write_i8(self, value: int):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf += struct.pack(Buf.SIGNED_CHAR, value)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.write_index += 1
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def write_u8(self, value: int):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf += struct.pack(Buf.UNSIGNED_CHAR, value)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.write_index += 1
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def write_bool(self, value: bool):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf += struct.pack(Buf.BOOLEAN, value)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.write_index += 1
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def write_i16(self, value: int):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf += struct.pack(Buf.ByteOrder.BIG_ENDIAN + Buf.SHORT, value)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.write_index += 2
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def write_i16_le(self, value: int):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf += struct.pack(Buf.ByteOrder.LITTLE_ENDIAN + Buf.SHORT, value)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.write_index += 2
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def write_u16(self, value: int):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf += struct.pack(Buf.ByteOrder.BIG_ENDIAN + Buf.UNSIGNED_SHORT, value)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.write_index += 2
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def write_u16_le(self, value: int):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf += struct.pack(Buf.ByteOrder.LITTLE_ENDIAN + Buf.UNSIGNED_SHORT, value)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.write_index += 2
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def write_i32(self, value: int):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf += struct.pack(Buf.ByteOrder.BIG_ENDIAN + Buf.INT, value)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.write_index += 4
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def write_i32_le(self, value: int):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf += struct.pack(Buf.ByteOrder.LITTLE_ENDIAN + Buf.INT, value)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.write_index += 4
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def write_u32(self, value: int):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf += struct.pack(Buf.ByteOrder.BIG_ENDIAN + Buf.UNSIGNED_INT, value)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.write_index += 4
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def write_u32_le(self, value: int):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf += struct.pack(Buf.ByteOrder.LITTLE_ENDIAN + Buf.UNSIGNED_INT, value)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.write_index += 4
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def write_i64(self, value: longlong):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf += struct.pack(Buf.ByteOrder.BIG_ENDIAN + Buf.LONG_LONG, value)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.write_index += 8
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def write_i64_le(self, value: longlong):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf += struct.pack(Buf.ByteOrder.LITTLE_ENDIAN + Buf.LONG_LONG, value)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.write_index += 8
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def write_u64(self, value: longlong):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf += struct.pack(Buf.ByteOrder.BIG_ENDIAN + Buf.UNSIGNED_LONG_LONG, value)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.write_index += 8
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def write_u64_le(self, value: longlong):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf += struct.pack(Buf.ByteOrder.LITTLE_ENDIAN + Buf.UNSIGNED_LONG_LONG, value)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.write_index += 8
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def write_f32(self, value: float):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf += struct.pack(Buf.ByteOrder.BIG_ENDIAN + Buf.FLOAT, value)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.write_index += 4
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def write_f32_le(self, value: float):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf += struct.pack(Buf.ByteOrder.LITTLE_ENDIAN + Buf.FLOAT, value)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.write_index += 4
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def write_f64(self, value: float):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf += struct.pack(Buf.ByteOrder.BIG_ENDIAN + Buf.DOUBLE, value)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.write_index += 8
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def write_f64_le(self, value: float):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf += struct.pack(Buf.ByteOrder.LITTLE_ENDIAN + Buf.DOUBLE, value)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.write_index += 8
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def write_bytes(self, value: bytes):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> if len(value) &amp;gt; 0:
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf += value
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.write_index += len(value)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def read_i8(self) -&amp;gt; int:
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.check_readable_bytes_len(1)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> ret = struct.unpack(Buf.SIGNED_CHAR, self.buf[self.read_index:self.read_index + 1])
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.read_index += 1
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> return ret[0]
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def read_u8(self):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.check_readable_bytes_len(1)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> ret = struct.unpack(Buf.UNSIGNED_CHAR, self.buf[self.read_index:self.read_index + 1])
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.read_index += 1
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> return ret[0]
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def read_bool(self):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.check_readable_bytes_len(1)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> ret = struct.unpack(Buf.BOOLEAN, self.buf[self.read_index:self.read_index + 1])
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.read_index += 1
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> return ret[0]
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def read_i16(self):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.check_readable_bytes_len(2)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> ret = struct.unpack(Buf.ByteOrder.BIG_ENDIAN + Buf.SHORT, self.buf[self.read_index:self.read_index + 2])
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.read_index += 2
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> return ret[0]
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def read_i16_le(self):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.check_readable_bytes_len(2)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> ret = struct.unpack(Buf.ByteOrder.LITTLE_ENDIAN + Buf.SHORT, self.buf[self.read_index:self.read_index + 2])
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.read_index += 2
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> return ret[0]
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def read_u16(self):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.check_readable_bytes_len(2)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> ret = struct.unpack(Buf.ByteOrder.BIG_ENDIAN + Buf.UNSIGNED_SHORT,
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf[self.read_index:self.read_index + 2])
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.read_index += 2
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> return ret[0]
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def read_u16_le(self):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.check_readable_bytes_len(2)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> ret = struct.unpack(Buf.ByteOrder.LITTLE_ENDIAN + Buf.UNSIGNED_SHORT,
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf[self.read_index:self.read_index + 2])
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.read_index += 2
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> return ret[0]
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def read_i32(self):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> ret = struct.unpack(Buf.ByteOrder.BIG_ENDIAN + Buf.INT,
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf[self.read_index:self.read_index + 4])
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.read_index += 4
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> return ret[0]
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def read_i32_le(self):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.check_readable_bytes_len(4)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> ret = struct.unpack(Buf.ByteOrder.LITTLE_ENDIAN + Buf.INT,
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf[self.read_index:self.read_index + 4])
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.read_index += 4
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> return ret[0]
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def read_u32(self):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.check_readable_bytes_len(4)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> ret = struct.unpack(Buf.ByteOrder.BIG_ENDIAN + Buf.UNSIGNED_INT,
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf[self.read_index:self.read_index + 4])
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.read_index += 4
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> return ret[0]
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def read_u32_le(self):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.check_readable_bytes_len(4)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> ret = struct.unpack(Buf.ByteOrder.LITTLE_ENDIAN + Buf.UNSIGNED_INT,
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf[self.read_index:self.read_index + 4])
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.read_index += 4
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> return ret[0]
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def read_i64(self):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.check_readable_bytes_len(8)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> ret = struct.unpack(Buf.ByteOrder.BIG_ENDIAN + Buf.LONG_LONG,
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf[self.read_index:self.read_index + 8])
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.read_index += 8
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> return ret[0]
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def read_i64_le(self):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.check_readable_bytes_len(8)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> ret = struct.unpack(Buf.ByteOrder.LITTLE_ENDIAN + Buf.LONG_LONG,
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf[self.read_index:self.read_index + 8])
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.read_index += 8
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> return ret[0]
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def read_u64(self):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.check_readable_bytes_len(8)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> ret = struct.unpack(Buf.ByteOrder.BIG_ENDIAN + Buf.UNSIGNED_LONG_LONG,
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf[self.read_index:self.read_index + 8])
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.read_index += 8
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> return ret[0]
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def read_u64_le(self):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.check_readable_bytes_len(8)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> ret = struct.unpack(Buf.ByteOrder.LITTLE_ENDIAN + Buf.UNSIGNED_LONG_LONG,
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf[self.read_index:self.read_index + 8])
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.read_index += 8
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> return ret[0]
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def read_f32(self):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.check_readable_bytes_len(4)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> ret = struct.unpack(Buf.ByteOrder.BIG_ENDIAN + Buf.FLOAT,
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf[self.read_index:self.read_index + 4])
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.read_index += 4
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> return ret[0]
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def read_f32_le(self):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.check_readable_bytes_len(4)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> ret = struct.unpack(Buf.ByteOrder.LITTLE_ENDIAN + Buf.FLOAT,
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf[self.read_index:self.read_index + 4])
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.read_index += 4
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> return ret[0]
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def read_f64(self):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.check_readable_bytes_len(8)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> ret = struct.unpack(Buf.ByteOrder.BIG_ENDIAN + Buf.DOUBLE,
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf[self.read_index:self.read_index + 8])
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.read_index += 8
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> return ret[0]
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def read_f64_le(self):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.check_readable_bytes_len(8)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> ret = struct.unpack(Buf.ByteOrder.LITTLE_ENDIAN + Buf.DOUBLE,
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf[self.read_index:self.read_index + 8])
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.read_index += 8
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> return ret[0]
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def read_bytes(self, length: int) -&amp;gt; bytearray:
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.check_readable_bytes_len(length)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> ret = self.buf[self.read_index:self.read_index + length]
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.read_index += length
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> return ret
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;h3 id="三编写单元测试">&lt;strong>三、编写单元测试&lt;/strong>
+&lt;/h3>&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt"> 1
+&lt;/span>&lt;span class="lnt"> 2
+&lt;/span>&lt;span class="lnt"> 3
+&lt;/span>&lt;span class="lnt"> 4
+&lt;/span>&lt;span class="lnt"> 5
+&lt;/span>&lt;span class="lnt"> 6
+&lt;/span>&lt;span class="lnt"> 7
+&lt;/span>&lt;span class="lnt"> 8
+&lt;/span>&lt;span class="lnt"> 9
+&lt;/span>&lt;span class="lnt"> 10
+&lt;/span>&lt;span class="lnt"> 11
+&lt;/span>&lt;span class="lnt"> 12
+&lt;/span>&lt;span class="lnt"> 13
+&lt;/span>&lt;span class="lnt"> 14
+&lt;/span>&lt;span class="lnt"> 15
+&lt;/span>&lt;span class="lnt"> 16
+&lt;/span>&lt;span class="lnt"> 17
+&lt;/span>&lt;span class="lnt"> 18
+&lt;/span>&lt;span class="lnt"> 19
+&lt;/span>&lt;span class="lnt"> 20
+&lt;/span>&lt;span class="lnt"> 21
+&lt;/span>&lt;span class="lnt"> 22
+&lt;/span>&lt;span class="lnt"> 23
+&lt;/span>&lt;span class="lnt"> 24
+&lt;/span>&lt;span class="lnt"> 25
+&lt;/span>&lt;span class="lnt"> 26
+&lt;/span>&lt;span class="lnt"> 27
+&lt;/span>&lt;span class="lnt"> 28
+&lt;/span>&lt;span class="lnt"> 29
+&lt;/span>&lt;span class="lnt"> 30
+&lt;/span>&lt;span class="lnt"> 31
+&lt;/span>&lt;span class="lnt"> 32
+&lt;/span>&lt;span class="lnt"> 33
+&lt;/span>&lt;span class="lnt"> 34
+&lt;/span>&lt;span class="lnt"> 35
+&lt;/span>&lt;span class="lnt"> 36
+&lt;/span>&lt;span class="lnt"> 37
+&lt;/span>&lt;span class="lnt"> 38
+&lt;/span>&lt;span class="lnt"> 39
+&lt;/span>&lt;span class="lnt"> 40
+&lt;/span>&lt;span class="lnt"> 41
+&lt;/span>&lt;span class="lnt"> 42
+&lt;/span>&lt;span class="lnt"> 43
+&lt;/span>&lt;span class="lnt"> 44
+&lt;/span>&lt;span class="lnt"> 45
+&lt;/span>&lt;span class="lnt"> 46
+&lt;/span>&lt;span class="lnt"> 47
+&lt;/span>&lt;span class="lnt"> 48
+&lt;/span>&lt;span class="lnt"> 49
+&lt;/span>&lt;span class="lnt"> 50
+&lt;/span>&lt;span class="lnt"> 51
+&lt;/span>&lt;span class="lnt"> 52
+&lt;/span>&lt;span class="lnt"> 53
+&lt;/span>&lt;span class="lnt"> 54
+&lt;/span>&lt;span class="lnt"> 55
+&lt;/span>&lt;span class="lnt"> 56
+&lt;/span>&lt;span class="lnt"> 57
+&lt;/span>&lt;span class="lnt"> 58
+&lt;/span>&lt;span class="lnt"> 59
+&lt;/span>&lt;span class="lnt"> 60
+&lt;/span>&lt;span class="lnt"> 61
+&lt;/span>&lt;span class="lnt"> 62
+&lt;/span>&lt;span class="lnt"> 63
+&lt;/span>&lt;span class="lnt"> 64
+&lt;/span>&lt;span class="lnt"> 65
+&lt;/span>&lt;span class="lnt"> 66
+&lt;/span>&lt;span class="lnt"> 67
+&lt;/span>&lt;span class="lnt"> 68
+&lt;/span>&lt;span class="lnt"> 69
+&lt;/span>&lt;span class="lnt"> 70
+&lt;/span>&lt;span class="lnt"> 71
+&lt;/span>&lt;span class="lnt"> 72
+&lt;/span>&lt;span class="lnt"> 73
+&lt;/span>&lt;span class="lnt"> 74
+&lt;/span>&lt;span class="lnt"> 75
+&lt;/span>&lt;span class="lnt"> 76
+&lt;/span>&lt;span class="lnt"> 77
+&lt;/span>&lt;span class="lnt"> 78
+&lt;/span>&lt;span class="lnt"> 79
+&lt;/span>&lt;span class="lnt"> 80
+&lt;/span>&lt;span class="lnt"> 81
+&lt;/span>&lt;span class="lnt"> 82
+&lt;/span>&lt;span class="lnt"> 83
+&lt;/span>&lt;span class="lnt"> 84
+&lt;/span>&lt;span class="lnt"> 85
+&lt;/span>&lt;span class="lnt"> 86
+&lt;/span>&lt;span class="lnt"> 87
+&lt;/span>&lt;span class="lnt"> 88
+&lt;/span>&lt;span class="lnt"> 89
+&lt;/span>&lt;span class="lnt"> 90
+&lt;/span>&lt;span class="lnt"> 91
+&lt;/span>&lt;span class="lnt"> 92
+&lt;/span>&lt;span class="lnt"> 93
+&lt;/span>&lt;span class="lnt"> 94
+&lt;/span>&lt;span class="lnt"> 95
+&lt;/span>&lt;span class="lnt"> 96
+&lt;/span>&lt;span class="lnt"> 97
+&lt;/span>&lt;span class="lnt"> 98
+&lt;/span>&lt;span class="lnt"> 99
+&lt;/span>&lt;span class="lnt">100
+&lt;/span>&lt;span class="lnt">101
+&lt;/span>&lt;span class="lnt">102
+&lt;/span>&lt;span class="lnt">103
+&lt;/span>&lt;span class="lnt">104
+&lt;/span>&lt;span class="lnt">105
+&lt;/span>&lt;span class="lnt">106
+&lt;/span>&lt;span class="lnt">107
+&lt;/span>&lt;span class="lnt">108
+&lt;/span>&lt;span class="lnt">109
+&lt;/span>&lt;span class="lnt">110
+&lt;/span>&lt;span class="lnt">111
+&lt;/span>&lt;span class="lnt">112
+&lt;/span>&lt;span class="lnt">113
+&lt;/span>&lt;span class="lnt">114
+&lt;/span>&lt;span class="lnt">115
+&lt;/span>&lt;span class="lnt">116
+&lt;/span>&lt;span class="lnt">117
+&lt;/span>&lt;span class="lnt">118
+&lt;/span>&lt;span class="lnt">119
+&lt;/span>&lt;span class="lnt">120
+&lt;/span>&lt;span class="lnt">121
+&lt;/span>&lt;span class="lnt">122
+&lt;/span>&lt;span class="lnt">123
+&lt;/span>&lt;span class="lnt">124
+&lt;/span>&lt;span class="lnt">125
+&lt;/span>&lt;span class="lnt">126
+&lt;/span>&lt;span class="lnt">127
+&lt;/span>&lt;span class="lnt">128
+&lt;/span>&lt;span class="lnt">129
+&lt;/span>&lt;span class="lnt">130
+&lt;/span>&lt;span class="lnt">131
+&lt;/span>&lt;span class="lnt">132
+&lt;/span>&lt;span class="lnt">133
+&lt;/span>&lt;span class="lnt">134
+&lt;/span>&lt;span class="lnt">135
+&lt;/span>&lt;span class="lnt">136
+&lt;/span>&lt;span class="lnt">137
+&lt;/span>&lt;span class="lnt">138
+&lt;/span>&lt;span class="lnt">139
+&lt;/span>&lt;span class="lnt">140
+&lt;/span>&lt;span class="lnt">141
+&lt;/span>&lt;span class="lnt">142
+&lt;/span>&lt;span class="lnt">143
+&lt;/span>&lt;span class="lnt">144
+&lt;/span>&lt;span class="lnt">145
+&lt;/span>&lt;span class="lnt">146
+&lt;/span>&lt;span class="lnt">147
+&lt;/span>&lt;span class="lnt">148
+&lt;/span>&lt;span class="lnt">149
+&lt;/span>&lt;span class="lnt">150
+&lt;/span>&lt;span class="lnt">151
+&lt;/span>&lt;span class="lnt">152
+&lt;/span>&lt;span class="lnt">153
+&lt;/span>&lt;span class="lnt">154
+&lt;/span>&lt;span class="lnt">155
+&lt;/span>&lt;span class="lnt">156
+&lt;/span>&lt;span class="lnt">157
+&lt;/span>&lt;span class="lnt">158
+&lt;/span>&lt;span class="lnt">159
+&lt;/span>&lt;span class="lnt">160
+&lt;/span>&lt;span class="lnt">161
+&lt;/span>&lt;span class="lnt">162
+&lt;/span>&lt;span class="lnt">163
+&lt;/span>&lt;span class="lnt">164
+&lt;/span>&lt;span class="lnt">165
+&lt;/span>&lt;span class="lnt">166
+&lt;/span>&lt;span class="lnt">167
+&lt;/span>&lt;span class="lnt">168
+&lt;/span>&lt;span class="lnt">169
+&lt;/span>&lt;span class="lnt">170
+&lt;/span>&lt;span class="lnt">171
+&lt;/span>&lt;span class="lnt">172
+&lt;/span>&lt;span class="lnt">173
+&lt;/span>&lt;span class="lnt">174
+&lt;/span>&lt;span class="lnt">175
+&lt;/span>&lt;span class="lnt">176
+&lt;/span>&lt;span class="lnt">177
+&lt;/span>&lt;span class="lnt">178
+&lt;/span>&lt;span class="lnt">179
+&lt;/span>&lt;span class="lnt">180
+&lt;/span>&lt;span class="lnt">181
+&lt;/span>&lt;span class="lnt">182
+&lt;/span>&lt;span class="lnt">183
+&lt;/span>&lt;span class="lnt">184
+&lt;/span>&lt;span class="lnt">185
+&lt;/span>&lt;span class="lnt">186
+&lt;/span>&lt;span class="lnt">187
+&lt;/span>&lt;span class="lnt">188
+&lt;/span>&lt;span class="lnt">189
+&lt;/span>&lt;span class="lnt">190
+&lt;/span>&lt;span class="lnt">191
+&lt;/span>&lt;span class="lnt">192
+&lt;/span>&lt;span class="lnt">193
+&lt;/span>&lt;span class="lnt">194
+&lt;/span>&lt;span class="lnt">195
+&lt;/span>&lt;span class="lnt">196
+&lt;/span>&lt;span class="lnt">197
+&lt;/span>&lt;span class="lnt">198
+&lt;/span>&lt;span class="lnt">199
+&lt;/span>&lt;span class="lnt">200
+&lt;/span>&lt;span class="lnt">201
+&lt;/span>&lt;span class="lnt">202
+&lt;/span>&lt;span class="lnt">203
+&lt;/span>&lt;span class="lnt">204
+&lt;/span>&lt;span class="lnt">205
+&lt;/span>&lt;span class="lnt">206
+&lt;/span>&lt;span class="lnt">207
+&lt;/span>&lt;span class="lnt">208
+&lt;/span>&lt;span class="lnt">209
+&lt;/span>&lt;span class="lnt">210
+&lt;/span>&lt;span class="lnt">211
+&lt;/span>&lt;span class="lnt">212
+&lt;/span>&lt;span class="lnt">213
+&lt;/span>&lt;span class="lnt">214
+&lt;/span>&lt;span class="lnt">215
+&lt;/span>&lt;span class="lnt">216
+&lt;/span>&lt;span class="lnt">217
+&lt;/span>&lt;span class="lnt">218
+&lt;/span>&lt;span class="lnt">219
+&lt;/span>&lt;span class="lnt">220
+&lt;/span>&lt;span class="lnt">221
+&lt;/span>&lt;span class="lnt">222
+&lt;/span>&lt;span class="lnt">223
+&lt;/span>&lt;span class="lnt">224
+&lt;/span>&lt;span class="lnt">225
+&lt;/span>&lt;span class="lnt">226
+&lt;/span>&lt;span class="lnt">227
+&lt;/span>&lt;span class="lnt">228
+&lt;/span>&lt;span class="lnt">229
+&lt;/span>&lt;span class="lnt">230
+&lt;/span>&lt;span class="lnt">231
+&lt;/span>&lt;span class="lnt">232
+&lt;/span>&lt;span class="lnt">233
+&lt;/span>&lt;span class="lnt">234
+&lt;/span>&lt;span class="lnt">235
+&lt;/span>&lt;span class="lnt">236
+&lt;/span>&lt;span class="lnt">237
+&lt;/span>&lt;span class="lnt">238
+&lt;/span>&lt;span class="lnt">239
+&lt;/span>&lt;span class="lnt">240
+&lt;/span>&lt;span class="lnt">241
+&lt;/span>&lt;span class="lnt">242
+&lt;/span>&lt;span class="lnt">243
+&lt;/span>&lt;span class="lnt">244
+&lt;/span>&lt;span class="lnt">245
+&lt;/span>&lt;span class="lnt">246
+&lt;/span>&lt;span class="lnt">247
+&lt;/span>&lt;span class="lnt">248
+&lt;/span>&lt;span class="lnt">249
+&lt;/span>&lt;span class="lnt">250
+&lt;/span>&lt;span class="lnt">251
+&lt;/span>&lt;span class="lnt">252
+&lt;/span>&lt;span class="lnt">253
+&lt;/span>&lt;span class="lnt">254
+&lt;/span>&lt;span class="lnt">255
+&lt;/span>&lt;span class="lnt">256
+&lt;/span>&lt;span class="lnt">257
+&lt;/span>&lt;span class="lnt">258
+&lt;/span>&lt;span class="lnt">259
+&lt;/span>&lt;span class="lnt">260
+&lt;/span>&lt;span class="lnt">261
+&lt;/span>&lt;span class="lnt">262
+&lt;/span>&lt;span class="lnt">263
+&lt;/span>&lt;span class="lnt">264
+&lt;/span>&lt;span class="lnt">265
+&lt;/span>&lt;span class="lnt">266
+&lt;/span>&lt;span class="lnt">267
+&lt;/span>&lt;span class="lnt">268
+&lt;/span>&lt;span class="lnt">269
+&lt;/span>&lt;span class="lnt">270
+&lt;/span>&lt;span class="lnt">271
+&lt;/span>&lt;span class="lnt">272
+&lt;/span>&lt;span class="lnt">273
+&lt;/span>&lt;span class="lnt">274
+&lt;/span>&lt;span class="lnt">275
+&lt;/span>&lt;span class="lnt">276
+&lt;/span>&lt;span class="lnt">277
+&lt;/span>&lt;span class="lnt">278
+&lt;/span>&lt;span class="lnt">279
+&lt;/span>&lt;span class="lnt">280
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-fallback" data-lang="fallback">&lt;span class="line">&lt;span class="cl">import os, sys
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">sys.path.append(os.getcwd())
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">from unittest import TestCase
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">import pytest
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">from buf.byte_buf import ByteBuf
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">class TestByteBuf(TestCase):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def setUp(self) -&amp;gt; None:
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf = ByteBuf()
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def test_byte_buf(self) -&amp;gt; int:
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_i8(127)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_i8(127)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_i8(1)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_f32(1)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> buf1 = ByteBuf(self.buf.to_bytes())
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.assertEqual(7, buf1.readable_bytes_len())
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def test_readable_bytes_len(self) -&amp;gt; int:
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_i8(127)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_i8(127)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_i8(1)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_f32(1)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.assertEqual(7, self.buf.readable_bytes_len())
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def test_to_bytes(self) -&amp;gt; bytes:
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_i8(127)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_i8(127)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_i8(1)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.assertEqual(b&amp;#39;\x7f\x7f\x01&amp;#39;, self.buf.to_bytes())
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def test_write_i8(self):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_i8(-128)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_i8(0)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_i8(127)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.assertEqual(-128, self.buf.read_i8())
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.assertEqual(0, self.buf.read_i8())
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.assertEqual(127, self.buf.read_i8())
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def test_write_i8_failed1(self):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> with pytest.raises(Exception):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_i8(128)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def test_write_i8_failed2(self):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> with pytest.raises(Exception):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_i8(-129)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def test_write_i8_failed3(self):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> with pytest.raises(Exception):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.read_i8()
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def test_write_u8(self):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_u8(0)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_u8(127)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_u8(255)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.assertEqual(0, self.buf.read_u8())
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.assertEqual(127, self.buf.read_u8())
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.assertEqual(255, self.buf.read_u8())
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def test_write_u8_failed1(self):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> with pytest.raises(Exception):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_u8(-1)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def test_write_u8_failed2(self):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> with pytest.raises(Exception):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_u8(256)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def test_write_bool(self):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_bool(True)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_bool(False)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_bool(1)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_bool(0)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_bool(22222)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.assertTrue(self.buf.read_bool())
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.assertFalse(self.buf.read_bool())
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.assertTrue(self.buf.read_bool())
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.assertFalse(self.buf.read_bool())
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.assertTrue(self.buf.read_bool())
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def test_write_i16(self):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_i16(-32768)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_i16(0)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_i16(127)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_i16(32767)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.assertEqual(-32768, self.buf.read_i16())
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.assertEqual(0, self.buf.read_i16())
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.assertEqual(127, self.buf.read_i16())
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.assertEqual(32767, self.buf.read_i16())
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def test_write_i16_failed1(self):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> with pytest.raises(Exception):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_i16(-32769)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def test_write_i16_failed2(self):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> with pytest.raises(Exception):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_i16(32768)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def test_write_i16_le(self):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_i16_le(-32768)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_i16_le(0)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_i16_le(127)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_i16_le(32767)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_i16_le(32767)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.assertEqual(-32768, self.buf.read_i16_le())
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.assertEqual(0, self.buf.read_i16_le())
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.assertEqual(127, self.buf.read_i16_le())
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.assertEqual(32767, self.buf.read_i16_le())
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.assertNotEqual(32767, self.buf.read_i16())
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def test_write_u16(self):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_u16(0)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_u16(127)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_u16(65535)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.assertEqual(0, self.buf.read_u16())
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.assertEqual(127, self.buf.read_u16())
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.assertEqual(65535, self.buf.read_u16())
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def test_write_u16_failed1(self):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> with pytest.raises(Exception):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_u16(-1)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def test_write_u16_failed2(self):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> with pytest.raises(Exception):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_u16(65536)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def test_write_u16_le(self):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_u16_le(0)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_u16_le(127)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_u16_le(65535)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_u16_le(65534)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.assertEqual(0, self.buf.read_u16_le())
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.assertEqual(127, self.buf.read_u16_le())
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.assertEqual(65535, self.buf.read_u16_le())
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.assertNotEqual(65534, self.buf.read_u16())
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def test_write_i32(self):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_i32(-2 ** 31)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_i32(0)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_i32(127)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_i32(127)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_i32(2 ** 31 - 1)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.assertEqual(-2 ** 31, self.buf.read_i32())
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.assertEqual(0, self.buf.read_i32())
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.assertEqual(127, self.buf.read_i32())
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.assertNotEqual(127, self.buf.read_i32_le())
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.assertEqual(2 ** 31 - 1, self.buf.read_i32())
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def test_write_i32_le(self):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_i32_le(-2 ** 31)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_i32_le(0)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_i32_le(127)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_i32_le(127)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_i32_le(2 ** 31 - 1)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.assertEqual(-2 ** 31, self.buf.read_i32_le())
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.assertEqual(0, self.buf.read_i32_le())
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.assertEqual(127, self.buf.read_i32_le())
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.assertNotEqual(127, self.buf.read_i32())
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.assertEqual(2 ** 31 - 1, self.buf.read_i32_le())
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def test_write_u32(self):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_u32(0)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_u32(127)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_u32(127)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_u32(2 ** 32 - 1)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.assertEqual(0, self.buf.read_u32())
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.assertEqual(127, self.buf.read_u32())
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.assertNotEqual(127, self.buf.read_u32_le())
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.assertEqual(2 ** 32 - 1, self.buf.read_u32())
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def test_write_u32_failed1(self):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> with pytest.raises(Exception):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_u32(-1)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def test_write_u32_failed2(self):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> with pytest.raises(Exception):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_u32(2 ** 32)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def test_write_u32_le(self):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_u32_le(0)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_u32_le(127)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_u32_le(127)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_u32_le(2 ** 32 - 1)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.assertEqual(0, self.buf.read_u32_le())
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.assertEqual(127, self.buf.read_u32_le())
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.assertNotEqual(127, self.buf.read_u32())
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.assertEqual(2 ** 32 - 1, self.buf.read_u32_le())
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def test_write_i64(self):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_i64(- 2 ** 63)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_i64(0)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_i64(127)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_i64(127)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_i64(2 ** 63 - 1)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.assertEqual(-2 ** 63, self.buf.read_i64())
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.assertEqual(0, self.buf.read_i64())
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.assertEqual(127, self.buf.read_i64())
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.assertNotEqual(127, self.buf.read_i64_le())
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.assertEqual(2 ** 63 - 1, self.buf.read_i64())
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def test_write_i64_le(self):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_i64_le(- 2 ** 63)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_i64_le(0)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_i64_le(127)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_i64_le(127)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_i64_le(2 ** 63 - 1)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.assertEqual(-2 ** 63, self.buf.read_i64_le())
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.assertEqual(0, self.buf.read_i64_le())
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.assertEqual(127, self.buf.read_i64_le())
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.assertNotEqual(127, self.buf.read_i64())
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.assertEqual(2 ** 63 - 1, self.buf.read_i64_le())
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def test_write_u64(self):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_i64_le(- 2 ** 63)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_i64_le(0)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_i64_le(127)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_i64_le(127)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_i64_le(2 ** 63 - 1)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.assertEqual(-2 ** 63, self.buf.read_i64_le())
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.assertEqual(0, self.buf.read_i64_le())
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.assertEqual(127, self.buf.read_i64_le())
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.assertNotEqual(127, self.buf.read_i64())
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.assertEqual(2 ** 63 - 1, self.buf.read_i64_le())
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def test_write_u64_le(self):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_u64_le(0)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_u64_le(127)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_u64_le(127)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_u64_le(2 ** 64 - 1)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.assertEqual(0, self.buf.read_u64_le())
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.assertEqual(127, self.buf.read_u64_le())
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.assertNotEqual(127, self.buf.read_u64())
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.assertEqual(2 ** 64 - 1, self.buf.read_u64_le())
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def test_write_f32(self):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_f32(0)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_f32(127)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_f32(127)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_f32(12.0)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.assertEqual(0, self.buf.read_f32())
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.assertEqual(127, self.buf.read_f32())
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.assertNotEqual(127, self.buf.read_f32_le())
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.assertEqual(12.0, self.buf.read_f32())
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def test_write_f32_le(self):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_f32_le(0)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_f32_le(127)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_f32_le(127)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_f32_le(12.0)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.assertEqual(0, self.buf.read_f32_le())
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.assertEqual(127, self.buf.read_f32_le())
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.assertNotEqual(127, self.buf.read_f32())
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.assertEqual(12.0, self.buf.read_f32_le())
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def test_write_f64(self):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_f64(0)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_f64(127)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_f64(127)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_f64(12.0)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.assertEqual(0, self.buf.read_f64())
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.assertEqual(127, self.buf.read_f64())
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.assertNotEqual(127, self.buf.read_f64_le())
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.assertEqual(12.0, self.buf.read_f64())
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def test_write_f64_le(self):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_f64_le(0)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_f64_le(127)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_f64_le(127)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_f64_le(12.0)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.assertEqual(0, self.buf.read_f64_le())
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.assertEqual(127, self.buf.read_f64_le())
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.assertNotEqual(127, self.buf.read_f64())
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.assertEqual(12.0, self.buf.read_f64_le())
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> def test_write_bytes(self):
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.buf.write_bytes(b&amp;#39;hello&amp;#39;)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.assertEqual(b&amp;#39;hel&amp;#39;, self.buf.read_bytes(3))
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> self.assertEqual(b&amp;#39;lo&amp;#39;, self.buf.read_bytes(2))
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;p>执行单元测试&lt;/p>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt">1
+&lt;/span>&lt;span class="lnt">2
+&lt;/span>&lt;span class="lnt">3
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-fallback" data-lang="fallback">&lt;span class="line">&lt;span class="cl">buf\test_byte_buf.py .................................. [100%]
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">============================================================================================= 34 passed in 0.60s ==============================================================================================
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;h3 id="四总结">&lt;strong>四、总结&lt;/strong>：
+&lt;/h3>&lt;p>该ByteBuf不考虑线程安全，仅提供了顺序读写的能力，未来在实际使用过程中根据实际完善，比如随机读写能力，基于多个ByteBuf进行Wrapper组合构建新的ByteBuf等。&lt;/p>
+&lt;p>参考文档：&lt;br>
+&lt;a class="link" href="https://netty.io/4.0/api/io/netty/buffer/ByteBuf.html" target="_blank" rel="noopener"
+>https://netty.io/4.0/api/io/netty/buffer/ByteBuf.html&lt;/a>
+&lt;a class="link" href="https://docs.oracle.com/javase/8/docs/api/java/nio/ByteBuffer.html" target="_blank" rel="noopener"
+>https://docs.oracle.com/javase/8/docs/api/java/nio/ByteBuffer.html&lt;/a>
+&lt;a class="link" href="https://docs.rs/bytes/1.1.0/bytes/" target="_blank" rel="noopener"
+>https://docs.rs/bytes/1.1.0/bytes/&lt;/a>&lt;/p>
+&lt;h3 id="下期预告基于bytebuf实现对交易所交易接口消息的封装">&lt;em>下期预告&lt;/em>：基于Bytebuf实现对交易所交易接口消息的封装
+&lt;/h3></description></item><item><title>Java 字符串拼接性能实测：基于 JMH 的微基准测试</title><link>https://xinchentechnote.github.io/note/p/java-%E5%AD%97%E7%AC%A6%E4%B8%B2%E6%8B%BC%E6%8E%A5%E6%80%A7%E8%83%BD%E5%AE%9E%E6%B5%8B%E5%9F%BA%E4%BA%8E-jmh-%E7%9A%84%E5%BE%AE%E5%9F%BA%E5%87%86%E6%B5%8B%E8%AF%95/</link><pubDate>Sun, 11 May 2025 10:29:30 +0800</pubDate><guid>https://xinchentechnote.github.io/note/p/java-%E5%AD%97%E7%AC%A6%E4%B8%B2%E6%8B%BC%E6%8E%A5%E6%80%A7%E8%83%BD%E5%AE%9E%E6%B5%8B%E5%9F%BA%E4%BA%8E-jmh-%E7%9A%84%E5%BE%AE%E5%9F%BA%E5%87%86%E6%B5%8B%E8%AF%95/</guid><description>&lt;h1 id="java-字符串拼接性能实测基于-jmh-的微基准测试">Java 字符串拼接性能实测：基于 JMH 的微基准测试
 &lt;/h1>&lt;p>在 Java 开发中，字符串拼接操作无处不在。你可能会直接使用 &lt;code>+&lt;/code>，也可能选择 &lt;code>StringBuilder&lt;/code> 或 &lt;code>StringBuffer&lt;/code>。它们在性能上究竟有何差别？在循环中拼接多个字符串时，哪种方式更高效？&lt;/p>
 &lt;p>本文基于 JMH（Java Microbenchmark Harness）进行了系统性测试，并使用 GitHub Actions 在 Ubuntu 环境中实测了不同字符串拼接方式的性能。&lt;/p>
 &lt;hr>
