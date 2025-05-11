@@ -5,6 +5,10 @@ on:
     branches: [ main ]
   workflow_dispatch: {}
 
+# 新增权限配置
+permissions:
+  contents: write  # 必须显式授予写权限
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
