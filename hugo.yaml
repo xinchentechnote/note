@@ -1,4 +1,5 @@
 baseURL: "https://xinchentechnote.github.io/note"
+relativeURLs: false 
 languageCode: "zh-cn"
 title: "xinchentechnote"
 theme: hugo-theme-stack
@@ -32,6 +33,11 @@ services:
 
 pagination:
     pagerSize: 3
+
+module:
+  mounts:
+    - source: assets/images
+      target: static/images  # 关键配置
 
 permalinks:
     post: /p/:slug/
