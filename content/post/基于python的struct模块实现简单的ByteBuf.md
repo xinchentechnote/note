@@ -25,7 +25,7 @@ netty中ByteBuf的基本结构如下：
 ```
 
 ### **一、Buf接口设计**
-![Buf接口](/images/pasted-image-20220405221600.png)
+![Buf接口](/note/images/pasted-image-20220405221600.png)
 ```
 import abc  
 import struct  
