@@ -2,10 +2,7 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: [ main ]  # 你开发用的分支
-
-permissions:
-  contents: write
+    branches: [ main ]
 
 jobs:
   deploy:
@@ -13,15 +10,25 @@ jobs:
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
+        with:
+          submodules: recursive  # 关键！强制拉取主题子模块
 
       - name: Setup Hugo
         uses: peaceiris/actions-hugo@v3
         with:
-          hugo-version: 'latest'
+          hugo-version: '0.125.7'  # 指定稳定版本
           extended: true
 
       - name: Build site
-        run: hugo
+        run: |
+          hugo \
+            --environment production \
+            --baseURL "https://xinchentechnote.github.io/note/" \
+            --cleanDestinationDir \
+            --minify
+
+      - name: Debug public dir
+        run: ls -R public  # 调试查看生成文件
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
@@ -29,3 +36,4 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./public
           publish_branch: gh-pages
+          force_orphan: true  # 强制清空旧文件
