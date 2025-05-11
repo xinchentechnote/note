@@ -23,7 +23,7 @@
 &lt;/div>&lt;h3 id="一buf接口设计">&lt;strong>一、Buf接口设计&lt;/strong>
 &lt;/h3>&lt;p>&lt;img src="https://xinchentechnote.github.io/note/images/pasted-image-20220405221600.png"
 loading="lazy"
-alt="描述文字"
+alt="Buf接口"
 >&lt;/p>
 &lt;div class="highlight">&lt;div class="chroma">
 &lt;table class="lntable">&lt;tr>&lt;td class="lntd">
@@ -455,9 +455,8 @@ alt="描述文字"
 &lt;/h3>&lt;p>ByteBuf底层使用可以字节数组bytearray作存储，记录分别读写的位置。
 &lt;img src="https://xinchentechnote.github.io/note/note/images/pasted-image-20220405221730.png"
 loading="lazy"
-alt="描述文字"
->
-![xxx]({{ &amp;ldquo;/images/pasted-image-20220405221730.png&amp;rdquo; | relURL }})&lt;/p>
+alt="ByteBuf"
+>&lt;/p>
 &lt;div class="highlight">&lt;div class="chroma">
 &lt;table class="lntable">&lt;tr>&lt;td class="lntd">
 &lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt"> 1
