@@ -456,7 +456,8 @@ alt="描述文字"
 &lt;img src="https://xinchentechnote.github.io/note/note/images/pasted-image-20220405221730.png"
 loading="lazy"
 alt="描述文字"
->&lt;/p>
+>
+![xxx]({{ &amp;ldquo;/images/pasted-image-20220405221730.png&amp;rdquo; | relURL }})&lt;/p>
 &lt;div class="highlight">&lt;div class="chroma">
 &lt;table class="lntable">&lt;tr>&lt;td class="lntd">
 &lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt"> 1
