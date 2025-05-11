@@ -15,18 +15,12 @@ hasCJKLanguage: true
 languages:
     en:
         languageName: English
-        title: Example Site
+        title: Xinchen tech note
         weight: 1
-        params:
-            sidebar:
-                subtitle: Example description
     zh-cn:
         languageName: 中文
-        title: 演示站点
+        title: 歆晨技术笔记
         weight: 2
-        params:
-            sidebar:
-                subtitle: 演示说明
     
 services:
     # Change it to your Disqus shortname before using
@@ -59,12 +53,11 @@ params:
         lastUpdated: Jan 02, 2006 15:04 MST
 
     sidebar:
-        emoji: 🍥
         subtitle: Lorem ipsum dolor sit amet, consectetur adipiscing elit.
         avatar:
             enabled: true
             local: true
-            src: img/avatar.png
+            src: img/blog_logo_mini.png
 
     article:
         math: false
