@@ -29,7 +29,7 @@ jobs:
             --minify
 
       - name: Debug public dir
-        run: ls -R public  # 调试查看生成文件
+        run: touch public/.nojekyll && tree public  # 调试查看生成文件
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
