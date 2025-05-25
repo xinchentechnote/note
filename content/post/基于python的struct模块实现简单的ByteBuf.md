@@ -793,6 +793,9 @@ https://netty.io/4.0/api/io/netty/buffer/ByteBuf.html
 https://docs.oracle.com/javase/8/docs/api/java/nio/ByteBuffer.html
 https://docs.rs/bytes/1.1.0/bytes/
 
-  
+*作者：xinchen*
+*首次发布日期：2025-05-25*
+*版权所有 © 2025*
+*作者信息：af83f787e8911dea9b3bf677746ebac9*
 
 ### *下期预告*：基于Bytebuf实现对交易所交易接口消息的封装
