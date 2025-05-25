@@ -1,0 +1,677 @@
+<!doctype html><html lang=zh-cn dir=ltr><head><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'><meta name=description content="C++ 二进制阅读器设计模式总结 本文从设计模式角度对一个基于 C++ 的二进制数据阅读器核心模块进行拆解和归纳，详细介绍了如何通过单例、工厂、策略、备忘录"><title>C++设计模式一</title>
+<link rel=canonical href=https://xinchentechnote.github.io/note/p/c-%E8%AE%BE%E8%AE%A1%E6%A8%A1%E5%BC%8F%E4%B8%80/><link rel=stylesheet href=/note/scss/style.min.663803bebe609202d5b39d848f2d7c2dc8b598a2d879efa079fa88893d29c49c.css><meta property='og:title' content="C++设计模式一"><meta property='og:description' content="C++ 二进制阅读器设计模式总结 本文从设计模式角度对一个基于 C++ 的二进制数据阅读器核心模块进行拆解和归纳，详细介绍了如何通过单例、工厂、策略、备忘录"><meta property='og:url' content='https://xinchentechnote.github.io/note/p/c-%E8%AE%BE%E8%AE%A1%E6%A8%A1%E5%BC%8F%E4%B8%80/'><meta property='og:site_name' content='歆晨技术笔记'><meta property='og:type' content='article'><meta property='article:section' content='Post'><meta property='article:tag' content='单例模式'><meta property='article:tag' content='工厂模式'><meta property='article:tag' content='策略模式'><meta property='article:tag' content='备忘录模式'><meta property='article:published_time' content='2025-05-25T21:20:23+08:00'><meta property='article:modified_time' content='2025-05-25T21:20:23+08:00'><meta name=twitter:title content="C++设计模式一"><meta name=twitter:description content="C++ 二进制阅读器设计模式总结 本文从设计模式角度对一个基于 C++ 的二进制数据阅读器核心模块进行拆解和归纳，详细介绍了如何通过单例、工厂、策略、备忘录"><link rel="shortcut icon" href=/note/img/blog_logo.ico></head><body class=article-page><script>(function(){const e="StackColorScheme";localStorage.getItem(e)||localStorage.setItem(e,"auto")})()</script><script>(function(){const t="StackColorScheme",e=localStorage.getItem(t),n=window.matchMedia("(prefers-color-scheme: dark)").matches===!0;e=="dark"||e==="auto"&&n?document.documentElement.dataset.scheme="dark":document.documentElement.dataset.scheme="light"})()</script><div class="container main-container flex on-phone--column extended"><aside class="sidebar left-sidebar sticky"><button class="hamburger hamburger--spin" type=button id=toggle-menu aria-label=切换菜单>
+<span class=hamburger-box><span class=hamburger-inner></span></span></button><header><figure class=site-avatar><a href=/note/><img src=/note/img/blog_logo_mini_hue9dc5c3df039dac32d0c307c32594f46_187239_300x0_resize_box_3.png width=300 height=300 class=site-logo loading=lazy alt=Avatar></a></figure><div class=site-meta><h1 class=site-name><a href=/note>歆晨技术笔记</a></h1><h2 class=site-description>勿在浮沙筑高台，沉淀、记录个人的技术笔记与总结。现某金融科技公司开发人员，主要负责网络编程，涉及相关网关组件架构设计与重构，低时延性能优化等。</h2></div></header><ol class=menu-social><li><a href=https://github.com/CaiJimmy/hugo-theme-stack target=_blank title=GitHub rel=me><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-github" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M9 19c-4.3 1.4-4.3-2.5-6-3m12 5v-3.5c0-1 .1-1.4-.5-2 2.8-.3 5.5-1.4 5.5-6a4.6 4.6.0 00-1.3-3.2 4.2 4.2.0 00-.1-3.2s-1.1-.3-3.5 1.3a12.3 12.3.0 00-6.2.0C6.5 2.8 5.4 3.1 5.4 3.1a4.2 4.2.0 00-.1 3.2A4.6 4.6.0 004 9.5c0 4.6 2.7 5.7 5.5 6-.6.6-.6 1.2-.5 2V21"/></svg></a></li><li><a href=https://twitter.com target=_blank title=Twitter rel=me><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-twitter" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M22 4.01c-1 .49-1.98.689-3 .99-1.121-1.265-2.783-1.335-4.38-.737S11.977 6.323 12 8v1c-3.245.083-6.135-1.395-8-4 0 0-4.182 7.433 4 11-1.872 1.247-3.739 2.088-6 2 3.308 1.803 6.913 2.423 10.034 1.517 3.58-1.04 6.522-3.723 7.651-7.742a13.84 13.84.0 00.497-3.753C20.18 7.773 21.692 5.25 22 4.009z"/></svg></a></li></ol><ol class=menu id=main-menu><li><a href=/note/><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-home" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><polyline points="5 12 3 12 12 3 21 12 19 12"/><path d="M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7"/><path d="M9 21v-6a2 2 0 012-2h2a2 2 0 012 2v6"/></svg>
+<span>主页</span></a></li><li><a href=/note/%E5%85%B3%E4%BA%8E/><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-user" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><circle cx="12" cy="7" r="4"/><path d="M6 21v-2a4 4 0 014-4h4a4 4 0 014 4v2"/></svg>
+<span>关于</span></a></li><li><a href=/note/archives/><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><rect x="3" y="4" width="18" height="4" rx="2"/><path d="M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+<span>Archives</span></a></li><li><a href=/note/search/><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><circle cx="10" cy="10" r="7"/><line x1="21" y1="21" x2="15" y2="15"/></svg>
+<span>Search</span></a></li><li><a href=/note/links/><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-link" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><path d="M10 14a3.5 3.5.0 005 0l4-4a3.5 3.5.0 00-5-5l-.5.5"/><path d="M14 10a3.5 3.5.0 00-5 0l-4 4a3.5 3.5.0 005 5l.5-.5"/></svg>
+<span>Links</span></a></li><li class=menu-bottom-section><ol class=menu><li id=i18n-switch><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 5h7"/><path d="M9 3v2c0 4.418-2.239 8-5 8"/><path d="M5 9c-.003 2.144 2.952 3.908 6.7 4"/><path d="M12 20l4-9 4 9"/><path d="M19.1 18h-6.2"/></svg>
+<select name=language title=language onchange="window.location.href=this.selectedOptions[0].value"><option value=https://xinchentechnote.github.io/note/en/>English</option><option value=https://xinchentechnote.github.io/note/ selected>中文</option></select></li><li id=dark-mode-toggle><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><circle cx="8" cy="12" r="2"/><rect x="2" y="6" width="20" height="12" rx="6"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-right" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><circle cx="16" cy="12" r="2"/><rect x="2" y="6" width="20" height="12" rx="6"/></svg>
+<span>暗色模式</span></li></ol></li></ol></aside><aside class="sidebar right-sidebar sticky"><section class="widget archives"><div class=widget-icon><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-hash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><line x1="5" y1="9" x2="19" y2="9"/><line x1="5" y1="15" x2="19" y2="15"/><line x1="11" y1="4" x2="7" y2="20"/><line x1="17" y1="4" x2="13" y2="20"/></svg></div><h2 class="widget-title section-title">目录</h2><div class=widget--toc><nav id=TableOfContents><ol><li><a href=#目录>目录</a></li><li><a href=#设计模式概览>设计模式概览</a><ol><li><a href=#单例模式singleton>单例模式（Singleton）</a></li><li><a href=#工厂模式factory>工厂模式（Factory）</a><ol><li><a href=#121-typefactory>1.2.1 TypeFactory</a></li><li><a href=#122-readerfactory>1.2.2 ReaderFactory</a></li></ol></li><li><a href=#策略模式strategy>策略模式（Strategy）</a><ol><li><a href=#131-抽象策略接口readerstrategy>1.3.1 抽象策略接口：<code>ReaderStrategy</code></a></li><li><a href=#132-具体策略>1.3.2 具体策略</a></li></ol></li><li><a href=#备忘录模式memento>备忘录模式（Memento）</a><ol><li><a href=#141-备忘录类record>1.4.1 备忘录类：<code>Record</code></a></li><li><a href=#142-原发器appstate>1.4.2 原发器：<code>AppState</code></a></li></ol></li><li><a href=#模板与类型特征template--traits>模板与类型特征（Template & Traits）</a><ol><li><a href=#151-类型特征typetraitst>1.5.1 类型特征：<code>TypeTraits&lt;T></code></a></li><li><a href=#152-appstatepeekt-与-readt>1.5.2 <code>AppState::peek&lt;T>()</code> 与 <code>read&lt;T>()</code></a></li></ol></li></ol></li><li><a href=#各模块与模式对应关系>各模块与模式对应关系</a></li><li><a href=#mermaid-类图>Mermaid 类图</a></li><li><a href=#整体架构与总结>整体架构与总结</a></li></ol></nav></div></section></aside><main class="main full-width"><article class=main-article><header class=article-header><div class=article-details><header class=article-category><a href=/note/categories/c++/>C++
+</a><a href=/note/categories/design-pattern/>Design Pattern</a></header><div class=article-title-wrapper><h2 class=article-title><a href=/note/p/c-%E8%AE%BE%E8%AE%A1%E6%A8%A1%E5%BC%8F%E4%B8%80/>C++设计模式一</a></h2></div><footer class=article-time><div><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-time" width="56" height="56" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><path d="M11.795 21H5a2 2 0 01-2-2V7a2 2 0 012-2h12a2 2 0 012 2v4"/><circle cx="18" cy="18" r="4"/><path d="M15 3v4"/><path d="M7 3v4"/><path d="M3 11h16"/><path d="M18 16.496V18l1 1"/></svg>
+<time class=article-time--published>May 25, 2025</time></div><div><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-clock" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 15"/></svg>
+<time class=article-time--reading>阅读时长: 12 分钟</time></div></footer></div></header><section class=article-content><h1 id=c-二进制阅读器设计模式总结>C++ 二进制阅读器设计模式总结</h1><p>本文从设计模式角度对一个基于 C++ 的二进制数据阅读器核心模块进行拆解和归纳，详细介绍了如何通过单例、工厂、策略、备忘录、模板与类型特征等模式，使得代码在扩展性、可维护性和灵活性方面达到最优。文末附有一张可在 GitHub 上直接渲染的 Mermaid 类图，帮助直观理解各模块之间的关系。</p><hr><h2 id=目录>目录</h2><ol><li><a class=link href=#%e8%ae%be%e8%ae%a1%e6%a8%a1%e5%bc%8f%e6%a6%82%e8%a7%88>设计模式概览</a>
+1.1 <a class=link href=#%e5%8d%95%e4%be%8b%e6%a8%a1%e5%bc%8fsingleton>单例模式（Singleton）</a>
+1.2 <a class=link href=#%e5%b7%a5%e5%8e%82%e6%a8%a1%e5%bc%8ffactory>工厂模式（Factory）</a>
+1.3 <a class=link href=#%e7%ad%96%e7%95%a5%e6%a8%a1%e5%bc%8fstrategy>策略模式（Strategy）</a>
+1.4 <a class=link href=#%e5%a4%87%e5%bf%98%e5%bd%95%e6%a8%a1%e5%bc%8fmemento>备忘录模式（Memento）</a>
+1.5 <a class=link href=#%e6%a8%a1%e6%9d%bf%e4%b8%8e%e7%b1%bb%e5%9e%8b%e7%89%b9%e5%be%81template--traits>模板与类型特征（Template & Traits）</a></li><li><a class=link href=#%e5%90%84%e6%a8%a1%e5%9d%97%e4%b8%8e%e6%a8%a1%e5%bc%8f%e5%af%b9%e5%ba%94%e5%85%b3%e7%b3%bb>各模块与模式对应关系</a></li><li><a class=link href=#mermaid-%e7%b1%bb%e5%9b%be>Mermaid 类图</a></li><li><a class=link href=#%e6%95%b4%e4%bd%93%e6%9e%b6%e6%9e%84%e4%b8%8e%e6%80%bb%e7%bb%93>整体架构与总结</a></li></ol><hr><h2 id=设计模式概览>设计模式概览</h2><h3 id=单例模式singleton>单例模式（Singleton）</h3><ul><li><strong>意图</strong>：保证一个类只有一个实例，并提供一个全局访问点。</li><li><strong>应用场景</strong>：全局类型注册器、全局读取器工厂等需要共享状态的场景。</li></ul><p>在本项目里，以下两个类被设计为单例：</p><ol><li><code>TypeFactory</code>：维护“类型名称（如 <code>"u8"</code>、<code>"i16"</code>）→ <code>std::type_index</code>”的映射。</li><li><code>ReaderFactory</code>：维护“读取类型名称（如 <code>"u8"</code>、<code>"string@u8"</code>）→ 对应的 <code>ReaderStrategy</code> 实例” 的映射。</li></ol><p>典型实现示例：</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span><span class=lnt>11
+</span><span class=lnt>12
+</span><span class=lnt>13
+</span><span class=lnt>14
+</span><span class=lnt>15
+</span><span class=lnt>16
+</span><span class=lnt>17
+</span><span class=lnt>18
+</span><span class=lnt>19
+</span><span class=lnt>20
+</span><span class=lnt>21
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-cpp data-lang=cpp><span class=line><span class=cl><span class=c1>// TypeFactory.hpp
+</span></span></span><span class=line><span class=cl><span class=c1></span><span class=k>class</span> <span class=nc>TypeFactory</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl><span class=k>public</span><span class=o>:</span>
+</span></span><span class=line><span class=cl>  <span class=k>static</span> <span class=n>TypeFactory</span><span class=o>&amp;</span> <span class=n>instance</span><span class=p>()</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>    <span class=k>static</span> <span class=n>TypeFactory</span> <span class=n>inst</span><span class=p>;</span>  <span class=c1>// 局部静态变量，C++11 及以后保证线程安全
+</span></span></span><span class=line><span class=cl><span class=c1></span>    <span class=k>return</span> <span class=n>inst</span><span class=p>;</span>
+</span></span><span class=line><span class=cl>  <span class=p>}</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>  <span class=c1>// 删除拷贝/赋值操作符，防止复制
+</span></span></span><span class=line><span class=cl><span class=c1></span>  <span class=n>TypeFactory</span><span class=p>(</span><span class=k>const</span> <span class=n>TypeFactory</span><span class=o>&amp;</span><span class=p>)</span> <span class=o>=</span> <span class=k>delete</span><span class=p>;</span>
+</span></span><span class=line><span class=cl>  <span class=n>TypeFactory</span><span class=o>&amp;</span> <span class=k>operator</span><span class=o>=</span><span class=p>(</span><span class=k>const</span> <span class=n>TypeFactory</span><span class=o>&amp;</span><span class=p>)</span> <span class=o>=</span> <span class=k>delete</span><span class=p>;</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>  <span class=n>std</span><span class=o>::</span><span class=n>type_index</span> <span class=n>getTypeIndex</span><span class=p>(</span><span class=k>const</span> <span class=n>std</span><span class=o>::</span><span class=n>string</span><span class=o>&amp;</span> <span class=n>shortName</span><span class=p>)</span> <span class=k>const</span> <span class=p>{</span> <span class=err>…</span> <span class=p>}</span>
+</span></span><span class=line><span class=cl>  <span class=k>template</span><span class=o>&lt;</span><span class=k>typename</span> <span class=n>T</span><span class=o>&gt;</span> <span class=k>static</span> <span class=n>std</span><span class=o>::</span><span class=n>string</span> <span class=n>getTypeShortName</span><span class=p>()</span> <span class=p>{</span> <span class=k>return</span> <span class=n>TypeTraits</span><span class=o>&lt;</span><span class=n>T</span><span class=o>&gt;::</span><span class=n>short_name</span><span class=p>();</span> <span class=p>}</span>
+</span></span><span class=line><span class=cl>  <span class=c1>// …
+</span></span></span><span class=line><span class=cl><span class=c1></span>
+</span></span><span class=line><span class=cl><span class=k>private</span><span class=o>:</span>
+</span></span><span class=line><span class=cl>  <span class=n>TypeFactory</span><span class=p>();</span>   <span class=c1>// 私有构造，内部完成所有类型注册
+</span></span></span><span class=line><span class=cl><span class=c1></span>  <span class=o>~</span><span class=n>TypeFactory</span><span class=p>();</span>  <span class=c1>// 私有析构
+</span></span></span><span class=line><span class=cl><span class=c1></span>  <span class=n>std</span><span class=o>::</span><span class=n>unordered_map</span><span class=o>&lt;</span><span class=n>std</span><span class=o>::</span><span class=n>string</span><span class=p>,</span> <span class=n>std</span><span class=o>::</span><span class=n>type_index</span><span class=o>&gt;</span> <span class=n>type_map_</span><span class=p>;</span>
+</span></span><span class=line><span class=cl><span class=p>};</span>
+</span></span></code></pre></td></tr></table></div></div><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span><span class=lnt>11
+</span><span class=lnt>12
+</span><span class=lnt>13
+</span><span class=lnt>14
+</span><span class=lnt>15
+</span><span class=lnt>16
+</span><span class=lnt>17
+</span><span class=lnt>18
+</span><span class=lnt>19
+</span><span class=lnt>20
+</span><span class=lnt>21
+</span><span class=lnt>22
+</span><span class=lnt>23
+</span><span class=lnt>24
+</span><span class=lnt>25
+</span><span class=lnt>26
+</span><span class=lnt>27
+</span><span class=lnt>28
+</span><span class=lnt>29
+</span><span class=lnt>30
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-cpp data-lang=cpp><span class=line><span class=cl><span class=c1>// ReaderFactory.hpp
+</span></span></span><span class=line><span class=cl><span class=c1></span><span class=k>class</span> <span class=nc>ReaderFactory</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl><span class=k>public</span><span class=o>:</span>
+</span></span><span class=line><span class=cl>  <span class=k>static</span> <span class=n>ReaderFactory</span><span class=o>&amp;</span> <span class=n>instance</span><span class=p>()</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>    <span class=k>static</span> <span class=n>ReaderFactory</span> <span class=n>inst</span><span class=p>;</span>  <span class=c1>// 同样利用局部静态变量保证线程安全
+</span></span></span><span class=line><span class=cl><span class=c1></span>    <span class=k>return</span> <span class=n>inst</span><span class=p>;</span>
+</span></span><span class=line><span class=cl>  <span class=p>}</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>  <span class=c1>// 删除拷贝/赋值操作符
+</span></span></span><span class=line><span class=cl><span class=c1></span>  <span class=n>ReaderFactory</span><span class=p>(</span><span class=k>const</span> <span class=n>ReaderFactory</span><span class=o>&amp;</span><span class=p>)</span> <span class=o>=</span> <span class=k>delete</span><span class=p>;</span>
+</span></span><span class=line><span class=cl>  <span class=n>ReaderFactory</span><span class=o>&amp;</span> <span class=k>operator</span><span class=o>=</span><span class=p>(</span><span class=k>const</span> <span class=n>ReaderFactory</span><span class=o>&amp;</span><span class=p>)</span> <span class=o>=</span> <span class=k>delete</span><span class=p>;</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>  <span class=kt>bool</span> <span class=nf>read</span><span class=p>(</span><span class=n>AppState</span><span class=o>&amp;</span> <span class=n>state</span><span class=p>,</span> <span class=k>const</span> <span class=n>std</span><span class=o>::</span><span class=n>string</span><span class=o>&amp;</span> <span class=n>typeName</span><span class=p>)</span> <span class=k>const</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>    <span class=k>auto</span> <span class=n>it</span> <span class=o>=</span> <span class=n>readers_</span><span class=p>.</span><span class=n>find</span><span class=p>(</span><span class=n>typeName</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>    <span class=k>if</span> <span class=p>(</span><span class=n>it</span> <span class=o>!=</span> <span class=n>readers_</span><span class=p>.</span><span class=n>end</span><span class=p>())</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>      <span class=k>return</span> <span class=n>it</span><span class=o>-&gt;</span><span class=n>second</span><span class=o>-&gt;</span><span class=n>read</span><span class=p>(</span><span class=n>state</span><span class=p>,</span> <span class=n>typeName</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>    <span class=p>}</span>
+</span></span><span class=line><span class=cl>    <span class=k>return</span> <span class=nb>false</span><span class=p>;</span>
+</span></span><span class=line><span class=cl>  <span class=p>}</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=k>private</span><span class=o>:</span>
+</span></span><span class=line><span class=cl>  <span class=n>ReaderFactory</span><span class=p>();</span>  <span class=c1>// 私有构造，内部注册所有 ReaderStrategy
+</span></span></span><span class=line><span class=cl><span class=c1></span>  <span class=o>~</span><span class=n>ReaderFactory</span><span class=p>();</span>
+</span></span><span class=line><span class=cl>  <span class=n>std</span><span class=o>::</span><span class=n>unordered_map</span><span class=o>&lt;</span><span class=n>std</span><span class=o>::</span><span class=n>string</span><span class=p>,</span> <span class=n>std</span><span class=o>::</span><span class=n>unique_ptr</span><span class=o>&lt;</span><span class=n>ReaderStrategy</span><span class=o>&gt;&gt;</span> <span class=n>readers_</span><span class=p>;</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>  <span class=k>template</span><span class=o>&lt;</span><span class=k>typename</span> <span class=n>T</span><span class=o>&gt;</span>
+</span></span><span class=line><span class=cl>  <span class=kt>void</span> <span class=n>emplaceReader</span><span class=p>(</span><span class=k>const</span> <span class=n>std</span><span class=o>::</span><span class=n>string</span><span class=o>&amp;</span> <span class=n>shortName</span><span class=p>)</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>    <span class=n>readers_</span><span class=p>.</span><span class=n>emplace</span><span class=p>(</span><span class=n>shortName</span><span class=p>,</span> <span class=n>std</span><span class=o>::</span><span class=n>make_unique</span><span class=o>&lt;</span><span class=n>TypedReader</span><span class=o>&lt;</span><span class=n>T</span><span class=o>&gt;&gt;</span><span class=p>());</span>
+</span></span><span class=line><span class=cl>  <span class=p>}</span>
+</span></span><span class=line><span class=cl><span class=p>};</span>
+</span></span></code></pre></td></tr></table></div></div><ul><li><p><strong>要点</strong></p><ol><li>私有构造/析构、删除拷贝与赋值，确保只能通过 <code>instance()</code> 获取实例。</li><li>C++11 后，局部静态变量的初始化线程安全，无需额外加锁。</li><li>单例中持有全局共享的数据（如映射表），只会被创建一次，降低运行时开销。</li></ol></li></ul><hr><h3 id=工厂模式factory>工厂模式（Factory）</h3><ul><li><p><strong>意图</strong>：将对象的创建与使用解耦，让“谁来创建对象”和“如何创建对象”的逻辑全部集中到一个或几个工厂类里。</p></li><li><p><strong>应用场景</strong>：</p><ul><li>新增或修改支持的基础类型时，只需在工厂里注册/修改相关逻辑；</li><li>客户端无需直接 <code>new</code> 某个类型，而是统一通过“类型名称 → 工厂”来获取实例。</li></ul></li></ul><h4 id=121-typefactory>1.2.1 TypeFactory</h4><ul><li><p>作用：完成“类型名称 → <code>std::type_index</code>”的映射与查询。</p></li><li><p>内部维护：</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt>1
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-cpp data-lang=cpp><span class=line><span class=cl><span class=n>std</span><span class=o>::</span><span class=n>unordered_map</span><span class=o>&lt;</span><span class=n>std</span><span class=o>::</span><span class=n>string</span><span class=p>,</span> <span class=n>std</span><span class=o>::</span><span class=n>type_index</span><span class=o>&gt;</span> <span class=n>type_map_</span><span class=p>;</span>
+</span></span></code></pre></td></tr></table></div></div></li><li><p>构造函数中批量注册所有基础类型：</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt>1
+</span><span class=lnt>2
+</span><span class=lnt>3
+</span><span class=lnt>4
+</span><span class=lnt>5
+</span><span class=lnt>6
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-cpp data-lang=cpp><span class=line><span class=cl><span class=n>TypeFactory</span><span class=o>::</span><span class=n>TypeFactory</span><span class=p>()</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>  <span class=n>type_map_</span><span class=p>.</span><span class=n>emplace</span><span class=p>(</span><span class=s>&#34;u8&#34;</span><span class=p>,</span>  <span class=k>typeid</span><span class=p>(</span><span class=kt>uint8_t</span><span class=p>));</span>
+</span></span><span class=line><span class=cl>  <span class=n>type_map_</span><span class=p>.</span><span class=n>emplace</span><span class=p>(</span><span class=s>&#34;i16&#34;</span><span class=p>,</span> <span class=k>typeid</span><span class=p>(</span><span class=kt>int16_t</span><span class=p>));</span>
+</span></span><span class=line><span class=cl>  <span class=n>type_map_</span><span class=p>.</span><span class=n>emplace</span><span class=p>(</span><span class=s>&#34;f32&#34;</span><span class=p>,</span> <span class=k>typeid</span><span class=p>(</span><span class=kt>float</span><span class=p>));</span>
+</span></span><span class=line><span class=cl>  <span class=c1>// …更多类型注册…
+</span></span></span><span class=line><span class=cl><span class=c1></span><span class=p>}</span>
+</span></span></code></pre></td></tr></table></div></div></li><li><p>对外提供：</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt>1
+</span><span class=lnt>2
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-cpp data-lang=cpp><span class=line><span class=cl><span class=n>std</span><span class=o>::</span><span class=n>type_index</span> <span class=n>getTypeIndex</span><span class=p>(</span><span class=k>const</span> <span class=n>std</span><span class=o>::</span><span class=n>string</span><span class=o>&amp;</span> <span class=n>shortName</span><span class=p>)</span> <span class=k>const</span><span class=p>;</span>
+</span></span><span class=line><span class=cl><span class=k>template</span><span class=o>&lt;</span><span class=k>typename</span> <span class=n>T</span><span class=o>&gt;</span> <span class=k>static</span> <span class=n>std</span><span class=o>::</span><span class=n>string</span> <span class=n>getTypeShortName</span><span class=p>()</span> <span class=p>{</span> <span class=k>return</span> <span class=n>TypeTraits</span><span class=o>&lt;</span><span class=n>T</span><span class=o>&gt;::</span><span class=n>short_name</span><span class=p>();</span> <span class=p>}</span>
+</span></span></code></pre></td></tr></table></div></div></li></ul><h4 id=122-readerfactory>1.2.2 ReaderFactory</h4><ul><li><p>作用：完成“类型名称 → <code>ReaderStrategy</code> 实例” 的映射与查询。</p></li><li><p>内部维护：</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt>1
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-cpp data-lang=cpp><span class=line><span class=cl><span class=n>std</span><span class=o>::</span><span class=n>unordered_map</span><span class=o>&lt;</span><span class=n>std</span><span class=o>::</span><span class=n>string</span><span class=p>,</span> <span class=n>std</span><span class=o>::</span><span class=n>unique_ptr</span><span class=o>&lt;</span><span class=n>ReaderStrategy</span><span class=o>&gt;&gt;</span> <span class=n>readers_</span><span class=p>;</span>
+</span></span></code></pre></td></tr></table></div></div></li><li><p>构造函数中注册各种读取策略：</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span><span class=lnt>11
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-cpp data-lang=cpp><span class=line><span class=cl><span class=n>ReaderFactory</span><span class=o>::</span><span class=n>ReaderFactory</span><span class=p>()</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>  <span class=c1>// 注册基础整数/浮点类型读取器
+</span></span></span><span class=line><span class=cl><span class=c1></span>  <span class=n>emplaceReader</span><span class=o>&lt;</span><span class=kt>uint8_t</span><span class=o>&gt;</span><span class=p>(</span><span class=s>&#34;u8&#34;</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>  <span class=n>emplaceReader</span><span class=o>&lt;</span><span class=kt>int16_t</span><span class=o>&gt;</span><span class=p>(</span><span class=s>&#34;i16&#34;</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>  <span class=n>emplaceReader</span><span class=o>&lt;</span><span class=kt>float</span><span class=o>&gt;</span><span class=p>(</span><span class=s>&#34;f32&#34;</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>  <span class=c1>// 注册固定长度字符串读取器，例如 &#34;string@8&#34;：读取 8 字节 C 风格字符串
+</span></span></span><span class=line><span class=cl><span class=c1></span>  <span class=n>readers_</span><span class=p>.</span><span class=n>emplace</span><span class=p>(</span><span class=s>&#34;string@8&#34;</span><span class=p>,</span> <span class=n>std</span><span class=o>::</span><span class=n>make_unique</span><span class=o>&lt;</span><span class=n>FixStringReader</span><span class=o>&gt;</span><span class=p>(</span><span class=mi>8</span><span class=p>));</span>
+</span></span><span class=line><span class=cl>  <span class=c1>// 注册长度前缀字符串读取器，例如 &#34;string@u16&#34;：先读一个 uint16_t 作为长度，再读后续字节
+</span></span></span><span class=line><span class=cl><span class=c1></span>  <span class=n>readers_</span><span class=p>.</span><span class=n>emplace</span><span class=p>(</span><span class=s>&#34;string@u16&#34;</span><span class=p>,</span> <span class=n>std</span><span class=o>::</span><span class=n>make_unique</span><span class=o>&lt;</span><span class=n>LengthPrefixedStringReader</span><span class=o>&lt;</span><span class=kt>uint16_t</span><span class=o>&gt;&gt;</span><span class=p>());</span>
+</span></span><span class=line><span class=cl>  <span class=c1>// …更多注册…
+</span></span></span><span class=line><span class=cl><span class=c1></span><span class=p>}</span>
+</span></span></code></pre></td></tr></table></div></div></li><li><p>对外提供：</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt>1
+</span><span class=lnt>2
+</span><span class=lnt>3
+</span><span class=lnt>4
+</span><span class=lnt>5
+</span><span class=lnt>6
+</span><span class=lnt>7
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-cpp data-lang=cpp><span class=line><span class=cl><span class=kt>bool</span> <span class=nf>read</span><span class=p>(</span><span class=n>AppState</span><span class=o>&amp;</span> <span class=n>state</span><span class=p>,</span> <span class=k>const</span> <span class=n>std</span><span class=o>::</span><span class=n>string</span><span class=o>&amp;</span> <span class=n>typeName</span><span class=p>)</span> <span class=k>const</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>  <span class=k>auto</span> <span class=n>it</span> <span class=o>=</span> <span class=n>readers_</span><span class=p>.</span><span class=n>find</span><span class=p>(</span><span class=n>typeName</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>  <span class=k>if</span> <span class=p>(</span><span class=n>it</span> <span class=o>!=</span> <span class=n>readers_</span><span class=p>.</span><span class=n>end</span><span class=p>())</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>    <span class=k>return</span> <span class=n>it</span><span class=o>-&gt;</span><span class=n>second</span><span class=o>-&gt;</span><span class=n>read</span><span class=p>(</span><span class=n>state</span><span class=p>,</span> <span class=n>typeName</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>  <span class=p>}</span>
+</span></span><span class=line><span class=cl>  <span class=k>return</span> <span class=nb>false</span><span class=p>;</span>
+</span></span><span class=line><span class=cl><span class=p>}</span>
+</span></span></code></pre></td></tr></table></div></div></li><li><p><strong>要点</strong></p><ol><li>将不同类型的“读取逻辑”注册到同一个映射表 <code>readers_</code> 中；</li><li>客户端只需调用 <code>ReaderFactory::instance().read(state, typeName)</code> 即可，无需关心内部具体实现；</li><li>新增读取类型时，只要实现新的 <code>ReaderStrategy</code> 并在构造中注册即可，符合开闭原则。</li></ol></li></ul><hr><h3 id=策略模式strategy>策略模式（Strategy）</h3><ul><li><strong>意图</strong>：定义一系列可互换的算法（策略），使它们可以独立于使用它们的客户端而变化。</li><li><strong>应用场景</strong>：读取不同类型的数据（基础整数/浮点、固定长度字符串、长度前缀字符串）本质上就是不同的“读取算法”，统一使用相同接口即可实现动态切换。</li></ul><h4 id=131-抽象策略接口readerstrategy>1.3.1 抽象策略接口：<code>ReaderStrategy</code></h4><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt>1
+</span><span class=lnt>2
+</span><span class=lnt>3
+</span><span class=lnt>4
+</span><span class=lnt>5
+</span><span class=lnt>6
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-cpp data-lang=cpp><span class=line><span class=cl><span class=c1>// ReaderStrategy.hpp
+</span></span></span><span class=line><span class=cl><span class=c1></span><span class=k>class</span> <span class=nc>ReaderStrategy</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl><span class=k>public</span><span class=o>:</span>
+</span></span><span class=line><span class=cl>  <span class=k>virtual</span> <span class=o>~</span><span class=n>ReaderStrategy</span><span class=p>()</span> <span class=o>=</span> <span class=k>default</span><span class=p>;</span>
+</span></span><span class=line><span class=cl>  <span class=k>virtual</span> <span class=kt>bool</span> <span class=nf>read</span><span class=p>(</span><span class=n>AppState</span><span class=o>&amp;</span> <span class=n>state</span><span class=p>,</span> <span class=n>std</span><span class=o>::</span><span class=n>string</span> <span class=n>typeName</span><span class=p>)</span> <span class=k>const</span> <span class=o>=</span> <span class=mi>0</span><span class=p>;</span>
+</span></span><span class=line><span class=cl><span class=p>};</span>
+</span></span></code></pre></td></tr></table></div></div><ul><li><strong>核心方法</strong>：<code>bool read(AppState& state, std::string typeName) const</code>，接收当前应用状态 <code>AppState</code> 和待读取数据的“类型名称”，返回是否读取成功，同时在内部更新 <code>AppState</code>（游标位置、状态消息、历史记录等）。</li></ul><h4 id=132-具体策略>1.3.2 具体策略</h4><ol><li><p><strong>TypedReader<t></strong></p><ul><li><p>用于读取定长的基础类型（如 <code>uint8_t</code>、<code>int16_t</code>、<code>float</code> 等）。</p></li><li><p>通过模板参数 <code>T</code>，在 <code>read()</code> 中调用：</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt>1
+</span><span class=lnt>2
+</span><span class=lnt>3
+</span><span class=lnt>4
+</span><span class=lnt>5
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-cpp data-lang=cpp><span class=line><span class=cl><span class=n>T</span> <span class=n>value</span> <span class=o>=</span> <span class=n>state</span><span class=p>.</span><span class=n>read</span><span class=o>&lt;</span><span class=n>T</span><span class=o>&gt;</span><span class=p>(</span><span class=n>state</span><span class=p>.</span><span class=n>getCursorPos</span><span class=p>());</span>
+</span></span><span class=line><span class=cl><span class=n>state</span><span class=p>.</span><span class=n>setStatusMsg</span><span class=p>(</span><span class=n>fmt</span><span class=o>::</span><span class=n>format</span><span class=p>(</span><span class=s>&#34;Read {}: {} @ 0x{:X}&#34;</span><span class=p>,</span> 
+</span></span><span class=line><span class=cl>                               <span class=n>Utils</span><span class=o>::</span><span class=n>format_value</span><span class=p>(</span><span class=n>value</span><span class=p>),</span> 
+</span></span><span class=line><span class=cl>                               <span class=n>state</span><span class=p>.</span><span class=n>getCursorPos</span><span class=p>()));</span>
+</span></span><span class=line><span class=cl><span class=k>return</span> <span class=nb>true</span><span class=p>;</span>
+</span></span></code></pre></td></tr></table></div></div></li><li><p>在 <code>ReaderFactory</code> 中使用 <code>emplaceReader&lt;uint8_t>("u8")</code>、<code>emplaceReader&lt;int16_t>("i16")</code> 等来注册。</p></li></ul></li><li><p><strong>FixStringReader</strong></p><ul><li><p>用于读取“固定长度的 C 风格字符串”，构造时传入一个 <code>size_t length</code>。</p></li><li><p><code>read()</code> 的实现类似：</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt>1
+</span><span class=lnt>2
+</span><span class=lnt>3
+</span><span class=lnt>4
+</span><span class=lnt>5
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-cpp data-lang=cpp><span class=line><span class=cl><span class=n>std</span><span class=o>::</span><span class=n>string</span> <span class=n>value</span> <span class=o>=</span> <span class=n>state</span><span class=p>.</span><span class=n>read_fixed_string</span><span class=p>(</span><span class=n>state</span><span class=p>.</span><span class=n>getCursorPos</span><span class=p>(),</span> <span class=n>length_</span><span class=p>);</span>
+</span></span><span class=line><span class=cl><span class=n>state</span><span class=p>.</span><span class=n>setStatusMsg</span><span class=p>(</span><span class=n>fmt</span><span class=o>::</span><span class=n>format</span><span class=p>(</span><span class=s>&#34;Read {}: {} @ 0x{:X}&#34;</span><span class=p>,</span> 
+</span></span><span class=line><span class=cl>                               <span class=n>Utils</span><span class=o>::</span><span class=n>format_value</span><span class=p>(</span><span class=n>value</span><span class=p>),</span> 
+</span></span><span class=line><span class=cl>                               <span class=n>state</span><span class=p>.</span><span class=n>getCursorPos</span><span class=p>()));</span>
+</span></span><span class=line><span class=cl><span class=k>return</span> <span class=nb>true</span><span class=p>;</span>
+</span></span></code></pre></td></tr></table></div></div></li></ul></li><li><p><strong>LengthPrefixedStringReader<lengthtype></strong></p><ul><li>用于读取“长度前缀字符串”，模板参数 <code>LengthType</code>（如 <code>uint8_t</code>、<code>uint16_t</code>、<code>uint32_t</code> 等）代表前缀所占字节数。</li><li><code>read()</code> 先调用 <code>state.read&lt;LengthType>(pos)</code> 得到字符串长度 N，再继续读取 N 字节作为实际字符串，更新状态并记录历史。</li></ul></li></ol><ul><li><p><strong>要点</strong></p><ol><li>各个读取逻辑继承自同一个 <code>ReaderStrategy</code> 接口；</li><li>在工厂中统一注册（<code>readers_["u8"] → TypedReader&lt;uint8_t></code>、<code>readers_["string@u8"] → LengthPrefixedStringReader&lt;uint8_t></code> 等），客户端只需传入不同的 <code>typeName</code>，工厂便会选择对应策略执行；</li><li>新增一种读取逻辑（例如“变长压缩整数”），只要实现新的 <code>ReaderStrategy</code> 子类并在 <code>ReaderFactory</code> 构造中注册即可，无需改动其它业务代码。</li></ol></li></ul><hr><h3 id=备忘录模式memento>备忘录模式（Memento）</h3><ul><li><strong>意图</strong>：在不破坏封装性的前提下，捕获并保存一个对象的内部状态，以便在以后恢复。</li><li><strong>应用场景</strong>：用户在任意时刻可以“撤销”最近一次读取，需要记录每次读取前的游标位置与读取到的数据值。</li></ul><h4 id=141-备忘录类record>1.4.1 备忘录类：<code>Record</code></h4><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span><span class=lnt>11
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-cpp data-lang=cpp><span class=line><span class=cl><span class=c1>// Record.hpp
+</span></span></span><span class=line><span class=cl><span class=c1></span><span class=k>struct</span> <span class=nc>Record</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>  <span class=n>size_t</span> <span class=n>index</span><span class=p>;</span>           <span class=c1>// 读取前的光标位置
+</span></span></span><span class=line><span class=cl><span class=c1></span>  <span class=n>std</span><span class=o>::</span><span class=n>any</span> <span class=n>data</span><span class=p>;</span>          <span class=c1>// 读取到的值（任意类型）
+</span></span></span><span class=line><span class=cl><span class=c1></span>  <span class=n>std</span><span class=o>::</span><span class=n>string</span> <span class=n>type_name</span><span class=p>;</span>  <span class=c1>// 记录类型的名称，便于展示或日志
+</span></span></span><span class=line><span class=cl><span class=c1></span>  <span class=n>Record</span><span class=p>(</span><span class=n>size_t</span> <span class=n>idx</span><span class=p>,</span> <span class=n>std</span><span class=o>::</span><span class=n>any</span> <span class=n>d</span><span class=p>,</span> <span class=k>const</span> <span class=n>std</span><span class=o>::</span><span class=n>string</span><span class=o>&amp;</span> <span class=n>t</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>    <span class=o>:</span> <span class=n>index</span><span class=p>(</span><span class=n>idx</span><span class=p>),</span> <span class=n>data</span><span class=p>(</span><span class=n>std</span><span class=o>::</span><span class=n>move</span><span class=p>(</span><span class=n>d</span><span class=p>)),</span> <span class=n>type_name</span><span class=p>(</span><span class=n>t</span><span class=p>)</span> <span class=p>{}</span>
+</span></span><span class=line><span class=cl>  <span class=n>std</span><span class=o>::</span><span class=n>string</span> <span class=n>description</span><span class=p>()</span> <span class=k>const</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>    <span class=k>return</span> <span class=n>fmt</span><span class=o>::</span><span class=n>format</span><span class=p>(</span><span class=s>&#34;{} @ 0x{:X}&#34;</span><span class=p>,</span> <span class=n>type_name</span><span class=p>,</span> <span class=n>index</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>  <span class=p>}</span>
+</span></span><span class=line><span class=cl><span class=p>};</span>
+</span></span></code></pre></td></tr></table></div></div><ul><li><strong>职责</strong>：在“读操作”发生时，先将当前光标 <code>index</code>、读取到的数据（封装为 <code>std::any</code>）以及对应的类型名称一起打包成一个 <code>Record</code>，压入 <code>AppState::read_history</code> 栈中。</li></ul><h4 id=142-原发器appstate>1.4.2 原发器：<code>AppState</code></h4><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span><span class=lnt>11
+</span><span class=lnt>12
+</span><span class=lnt>13
+</span><span class=lnt>14
+</span><span class=lnt>15
+</span><span class=lnt>16
+</span><span class=lnt>17
+</span><span class=lnt>18
+</span><span class=lnt>19
+</span><span class=lnt>20
+</span><span class=lnt>21
+</span><span class=lnt>22
+</span><span class=lnt>23
+</span><span class=lnt>24
+</span><span class=lnt>25
+</span><span class=lnt>26
+</span><span class=lnt>27
+</span><span class=lnt>28
+</span><span class=lnt>29
+</span><span class=lnt>30
+</span><span class=lnt>31
+</span><span class=lnt>32
+</span><span class=lnt>33
+</span><span class=lnt>34
+</span><span class=lnt>35
+</span><span class=lnt>36
+</span><span class=lnt>37
+</span><span class=lnt>38
+</span><span class=lnt>39
+</span><span class=lnt>40
+</span><span class=lnt>41
+</span><span class=lnt>42
+</span><span class=lnt>43
+</span><span class=lnt>44
+</span><span class=lnt>45
+</span><span class=lnt>46
+</span><span class=lnt>47
+</span><span class=lnt>48
+</span><span class=lnt>49
+</span><span class=lnt>50
+</span><span class=lnt>51
+</span><span class=lnt>52
+</span><span class=lnt>53
+</span><span class=lnt>54
+</span><span class=lnt>55
+</span><span class=lnt>56
+</span><span class=lnt>57
+</span><span class=lnt>58
+</span><span class=lnt>59
+</span><span class=lnt>60
+</span><span class=lnt>61
+</span><span class=lnt>62
+</span><span class=lnt>63
+</span><span class=lnt>64
+</span><span class=lnt>65
+</span><span class=lnt>66
+</span><span class=lnt>67
+</span><span class=lnt>68
+</span><span class=lnt>69
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-cpp data-lang=cpp><span class=line><span class=cl><span class=c1>// AppState.hpp
+</span></span></span><span class=line><span class=cl><span class=c1></span><span class=k>class</span> <span class=nc>AppState</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl><span class=k>public</span><span class=o>:</span>
+</span></span><span class=line><span class=cl>  <span class=n>AppState</span><span class=p>(</span><span class=k>const</span> <span class=n>std</span><span class=o>::</span><span class=n>vector</span><span class=o>&lt;</span><span class=kt>uint8_t</span><span class=o>&gt;&amp;</span> <span class=n>data</span><span class=p>)</span> <span class=o>:</span> <span class=n>data_</span><span class=p>(</span><span class=n>data</span><span class=p>)</span> <span class=p>{}</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>  <span class=k>template</span><span class=o>&lt;</span><span class=k>typename</span> <span class=n>T</span><span class=o>&gt;</span>
+</span></span><span class=line><span class=cl>  <span class=n>T</span> <span class=n>peek</span><span class=p>(</span><span class=n>size_t</span> <span class=n>pos</span><span class=p>)</span> <span class=k>const</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>    <span class=c1>// 从 data_ 中读取 sizeof(T) 字节并根据小端或大端转换为 T
+</span></span></span><span class=line><span class=cl><span class=c1></span>    <span class=n>T</span> <span class=n>value</span> <span class=o>=</span> <span class=mi>0</span><span class=p>;</span>
+</span></span><span class=line><span class=cl>    <span class=k>for</span> <span class=p>(</span><span class=n>size_t</span> <span class=n>i</span> <span class=o>=</span> <span class=mi>0</span><span class=p>;</span> <span class=n>i</span> <span class=o>&lt;</span> <span class=k>sizeof</span><span class=p>(</span><span class=n>T</span><span class=p>);</span> <span class=o>++</span><span class=n>i</span><span class=p>)</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>      <span class=n>value</span> <span class=o>|=</span> <span class=p>(</span><span class=n>T</span><span class=p>(</span><span class=n>data_</span><span class=p>[</span><span class=n>pos</span> <span class=o>+</span> <span class=n>i</span><span class=p>])</span> <span class=o>&lt;&lt;</span> <span class=p>(</span><span class=mi>8</span> <span class=o>*</span> <span class=n>i</span><span class=p>));</span>  <span class=c1>// 假设小端字节序
+</span></span></span><span class=line><span class=cl><span class=c1></span>    <span class=p>}</span>
+</span></span><span class=line><span class=cl>    <span class=k>return</span> <span class=n>value</span><span class=p>;</span>
+</span></span><span class=line><span class=cl>  <span class=p>}</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>  <span class=k>template</span><span class=o>&lt;</span><span class=k>typename</span> <span class=n>T</span><span class=o>&gt;</span>
+</span></span><span class=line><span class=cl>  <span class=n>T</span> <span class=n>read</span><span class=p>(</span><span class=n>size_t</span> <span class=n>pos</span><span class=p>)</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>    <span class=n>T</span> <span class=n>value</span> <span class=o>=</span> <span class=n>peek</span><span class=o>&lt;</span><span class=n>T</span><span class=o>&gt;</span><span class=p>(</span><span class=n>pos</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>    <span class=c1>// 在读取前先保存一份“备忘录”到 read_history
+</span></span></span><span class=line><span class=cl><span class=c1></span>    <span class=n>Record</span> <span class=n>record</span><span class=p>{</span><span class=n>pos</span><span class=p>,</span> <span class=n>value</span><span class=p>,</span> <span class=n>TypeFactory</span><span class=o>::</span><span class=n>getTypeShortName</span><span class=o>&lt;</span><span class=n>T</span><span class=o>&gt;</span><span class=p>()};</span>
+</span></span><span class=line><span class=cl>    <span class=n>read_history</span><span class=p>.</span><span class=n>push</span><span class=p>(</span><span class=n>std</span><span class=o>::</span><span class=n>move</span><span class=p>(</span><span class=n>record</span><span class=p>));</span>
+</span></span><span class=line><span class=cl>    <span class=c1>// 将游标往前移动 sizeof(T) 个字节
+</span></span></span><span class=line><span class=cl><span class=c1></span>    <span class=n>cursor_pos_</span> <span class=o>=</span> <span class=n>pos</span> <span class=o>+</span> <span class=k>sizeof</span><span class=p>(</span><span class=n>T</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>    <span class=n>status_msg_</span> <span class=o>=</span> <span class=n>fmt</span><span class=o>::</span><span class=n>format</span><span class=p>(</span><span class=s>&#34;Read {}: {} @ 0x{:X}&#34;</span><span class=p>,</span> 
+</span></span><span class=line><span class=cl>                              <span class=n>Utils</span><span class=o>::</span><span class=n>format_value</span><span class=p>(</span><span class=n>value</span><span class=p>),</span> <span class=n>pos</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>    <span class=k>return</span> <span class=n>value</span><span class=p>;</span>
+</span></span><span class=line><span class=cl>  <span class=p>}</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>  <span class=n>std</span><span class=o>::</span><span class=n>string</span> <span class=n>read_fixed_string</span><span class=p>(</span><span class=n>size_t</span> <span class=n>pos</span><span class=p>,</span> <span class=n>size_t</span> <span class=n>length</span><span class=p>)</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>    <span class=n>std</span><span class=o>::</span><span class=n>string</span> <span class=n>s</span><span class=p>(</span><span class=k>reinterpret_cast</span><span class=o>&lt;</span><span class=k>const</span> <span class=kt>char</span><span class=o>*&gt;</span><span class=p>(</span><span class=o>&amp;</span><span class=n>data_</span><span class=p>[</span><span class=n>pos</span><span class=p>]),</span> <span class=n>length</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>    <span class=n>Record</span> <span class=n>record</span><span class=p>{</span><span class=n>pos</span><span class=p>,</span> <span class=n>s</span><span class=p>,</span> <span class=n>fmt</span><span class=o>::</span><span class=n>format</span><span class=p>(</span><span class=s>&#34;string@{}&#34;</span><span class=p>,</span> <span class=n>length</span><span class=p>)};</span>
+</span></span><span class=line><span class=cl>    <span class=n>read_history</span><span class=p>.</span><span class=n>push</span><span class=p>(</span><span class=n>std</span><span class=o>::</span><span class=n>move</span><span class=p>(</span><span class=n>record</span><span class=p>));</span>
+</span></span><span class=line><span class=cl>    <span class=n>cursor_pos_</span> <span class=o>=</span> <span class=n>pos</span> <span class=o>+</span> <span class=n>length</span><span class=p>;</span>
+</span></span><span class=line><span class=cl>    <span class=n>status_msg_</span> <span class=o>=</span> <span class=n>fmt</span><span class=o>::</span><span class=n>format</span><span class=p>(</span><span class=s>&#34;Read {}: {} @ 0x{:X}&#34;</span><span class=p>,</span> <span class=n>Utils</span><span class=o>::</span><span class=n>format_value</span><span class=p>(</span><span class=n>s</span><span class=p>),</span> <span class=n>pos</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>    <span class=k>return</span> <span class=n>s</span><span class=p>;</span>
+</span></span><span class=line><span class=cl>  <span class=p>}</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>  <span class=k>template</span><span class=o>&lt;</span><span class=k>typename</span> <span class=n>LengthType</span><span class=o>&gt;</span>
+</span></span><span class=line><span class=cl>  <span class=n>std</span><span class=o>::</span><span class=n>string</span> <span class=n>read_length_prefixed_string</span><span class=p>(</span><span class=n>size_t</span> <span class=n>pos</span><span class=p>)</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>    <span class=n>LengthType</span> <span class=n>len</span> <span class=o>=</span> <span class=n>read</span><span class=o>&lt;</span><span class=n>LengthType</span><span class=o>&gt;</span><span class=p>(</span><span class=n>pos</span><span class=p>);</span>  <span class=c1>// 递归调用 read&lt;T&gt;，也会记录备忘录
+</span></span></span><span class=line><span class=cl><span class=c1></span>    <span class=n>size_t</span> <span class=n>strPos</span> <span class=o>=</span> <span class=n>pos</span> <span class=o>+</span> <span class=k>sizeof</span><span class=p>(</span><span class=n>LengthType</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>    <span class=n>std</span><span class=o>::</span><span class=n>string</span> <span class=n>s</span><span class=p>(</span><span class=k>reinterpret_cast</span><span class=o>&lt;</span><span class=k>const</span> <span class=kt>char</span><span class=o>*&gt;</span><span class=p>(</span><span class=o>&amp;</span><span class=n>data_</span><span class=p>[</span><span class=n>strPos</span><span class=p>]),</span> <span class=n>len</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>    <span class=n>Record</span> <span class=n>record</span><span class=p>{</span><span class=n>pos</span><span class=p>,</span> <span class=n>s</span><span class=p>,</span> <span class=n>fmt</span><span class=o>::</span><span class=n>format</span><span class=p>(</span><span class=s>&#34;string@{}&#34;</span><span class=p>,</span> <span class=n>TypeFactory</span><span class=o>::</span><span class=n>getTypeShortName</span><span class=o>&lt;</span><span class=n>LengthType</span><span class=o>&gt;</span><span class=p>())};</span>
+</span></span><span class=line><span class=cl>    <span class=n>read_history</span><span class=p>.</span><span class=n>push</span><span class=p>(</span><span class=n>std</span><span class=o>::</span><span class=n>move</span><span class=p>(</span><span class=n>record</span><span class=p>));</span>
+</span></span><span class=line><span class=cl>    <span class=n>cursor_pos_</span> <span class=o>=</span> <span class=n>strPos</span> <span class=o>+</span> <span class=n>len</span><span class=p>;</span>
+</span></span><span class=line><span class=cl>    <span class=n>status_msg_</span> <span class=o>=</span> <span class=n>fmt</span><span class=o>::</span><span class=n>format</span><span class=p>(</span><span class=s>&#34;Read {}: {} @ 0x{:X}&#34;</span><span class=p>,</span> <span class=n>Utils</span><span class=o>::</span><span class=n>format_value</span><span class=p>(</span><span class=n>s</span><span class=p>),</span> <span class=n>pos</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>    <span class=k>return</span> <span class=n>s</span><span class=p>;</span>
+</span></span><span class=line><span class=cl>  <span class=p>}</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>  <span class=kt>void</span> <span class=nf>undo</span><span class=p>()</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>    <span class=k>if</span> <span class=p>(</span><span class=o>!</span><span class=n>read_history</span><span class=p>.</span><span class=n>empty</span><span class=p>())</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>      <span class=n>Record</span> <span class=n>record</span> <span class=o>=</span> <span class=n>read_history</span><span class=p>.</span><span class=n>top</span><span class=p>();</span>
+</span></span><span class=line><span class=cl>      <span class=n>read_history</span><span class=p>.</span><span class=n>pop</span><span class=p>();</span>
+</span></span><span class=line><span class=cl>      <span class=n>cursor_pos_</span> <span class=o>=</span> <span class=n>record</span><span class=p>.</span><span class=n>index</span><span class=p>;</span>  <span class=c1>// 恢复到读取前的光标位置
+</span></span></span><span class=line><span class=cl><span class=c1></span>      <span class=n>status_msg_</span> <span class=o>=</span> <span class=n>fmt</span><span class=o>::</span><span class=n>format</span><span class=p>(</span><span class=s>&#34;Undo to {}&#34;</span><span class=p>,</span> <span class=n>record</span><span class=p>.</span><span class=n>description</span><span class=p>());</span>
+</span></span><span class=line><span class=cl>    <span class=p>}</span>
+</span></span><span class=line><span class=cl>  <span class=p>}</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>  <span class=n>size_t</span> <span class=nf>getCursorPos</span><span class=p>()</span> <span class=k>const</span> <span class=p>{</span> <span class=k>return</span> <span class=n>cursor_pos_</span><span class=p>;</span> <span class=p>}</span>
+</span></span><span class=line><span class=cl>  <span class=kt>void</span> <span class=nf>setCursorPos</span><span class=p>(</span><span class=n>size_t</span> <span class=n>pos</span><span class=p>)</span> <span class=p>{</span> <span class=n>cursor_pos_</span> <span class=o>=</span> <span class=n>pos</span><span class=p>;</span> <span class=p>}</span>
+</span></span><span class=line><span class=cl>  <span class=n>std</span><span class=o>::</span><span class=n>string</span> <span class=n>getStatusMsg</span><span class=p>()</span> <span class=k>const</span> <span class=p>{</span> <span class=k>return</span> <span class=n>status_msg_</span><span class=p>;</span> <span class=p>}</span>
+</span></span><span class=line><span class=cl>  <span class=n>std</span><span class=o>::</span><span class=n>stack</span><span class=o>&lt;</span><span class=n>Record</span><span class=o>&gt;</span> <span class=n>getReadHistory</span><span class=p>()</span> <span class=k>const</span> <span class=p>{</span> <span class=k>return</span> <span class=n>read_history</span><span class=p>;</span> <span class=p>}</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=k>private</span><span class=o>:</span>
+</span></span><span class=line><span class=cl>  <span class=n>std</span><span class=o>::</span><span class=n>vector</span><span class=o>&lt;</span><span class=kt>uint8_t</span><span class=o>&gt;</span> <span class=n>data_</span><span class=p>;</span>     <span class=c1>// 待解析的二进制数据
+</span></span></span><span class=line><span class=cl><span class=c1></span>  <span class=n>size_t</span> <span class=n>cursor_pos_</span> <span class=o>=</span> <span class=mi>0</span><span class=p>;</span>         <span class=c1>// 当前光标位置
+</span></span></span><span class=line><span class=cl><span class=c1></span>  <span class=n>std</span><span class=o>::</span><span class=n>string</span> <span class=n>status_msg_</span><span class=p>;</span>        <span class=c1>// 最近一次操作的状态消息
+</span></span></span><span class=line><span class=cl><span class=c1></span>  <span class=n>std</span><span class=o>::</span><span class=n>stack</span><span class=o>&lt;</span><span class=n>Record</span><span class=o>&gt;</span> <span class=n>read_history</span><span class=p>;</span>  
+</span></span><span class=line><span class=cl><span class=p>};</span>
+</span></span></code></pre></td></tr></table></div></div><ul><li><p><strong>要点</strong></p><ol><li><code>AppState</code> 同时扮演了“原发器（Originator）”和“管理者（Caretaker）”的角色；</li><li>每次 <code>read&lt;T></code>、<code>read_fixed_string()</code>、<code>read_length_prefixed_string()</code> 都会先将当前状态封装到 <code>Record</code>，再执行真正的读取操作；</li><li><code>undo()</code> 从堆栈顶弹出最近的 <code>Record</code>，并恢复 <code>cursor_pos_</code>，达到“撤销最近一次读取”的效果；</li><li>通过调用 <code>getReadHistory()</code> 可以获取整个读取历史栈，便于日志输出或调试。</li></ol></li></ul><hr><h3 id=模板与类型特征template--traits>模板与类型特征（Template & Traits）</h3><ul><li><p><strong>意图</strong>：</p><ul><li>利用 C++ 模板生成对不同基础类型（如 <code>uint8_t</code>、<code>int16_t</code>、<code>float</code> 等）的通用读取逻辑，减少重复代码；</li><li>通过“类型特征（Traits）”在编译期将类型与它们对应的名称绑定，方便在程序运行时取得相应字符串。</li></ul></li></ul><h4 id=151-类型特征typetraitst>1.5.1 类型特征：<code>TypeTraits&lt;T></code></h4><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span><span class=lnt>11
+</span><span class=lnt>12
+</span><span class=lnt>13
+</span><span class=lnt>14
+</span><span class=lnt>15
+</span><span class=lnt>16
+</span><span class=lnt>17
+</span><span class=lnt>18
+</span><span class=lnt>19
+</span><span class=lnt>20
+</span><span class=lnt>21
+</span><span class=lnt>22
+</span><span class=lnt>23
+</span><span class=lnt>24
+</span><span class=lnt>25
+</span><span class=lnt>26
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-cpp data-lang=cpp><span class=line><span class=cl><span class=c1>// TypeTraits.hpp
+</span></span></span><span class=line><span class=cl><span class=c1></span><span class=k>template</span> <span class=o>&lt;</span><span class=k>typename</span> <span class=n>T</span><span class=o>&gt;</span>
+</span></span><span class=line><span class=cl><span class=k>struct</span> <span class=nc>TypeTraits</span><span class=p>;</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=c1>// 偏特化：uint8_t
+</span></span></span><span class=line><span class=cl><span class=c1></span><span class=k>template</span> <span class=o>&lt;&gt;</span>
+</span></span><span class=line><span class=cl><span class=k>struct</span> <span class=nc>TypeTraits</span><span class=o>&lt;</span><span class=kt>uint8_t</span><span class=o>&gt;</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>  <span class=k>static</span> <span class=n>std</span><span class=o>::</span><span class=n>string</span> <span class=n>name</span><span class=p>()</span>       <span class=p>{</span> <span class=k>return</span> <span class=s>&#34;unsigned 8-bit integer&#34;</span><span class=p>;</span> <span class=p>}</span>
+</span></span><span class=line><span class=cl>  <span class=k>static</span> <span class=n>std</span><span class=o>::</span><span class=n>string</span> <span class=n>short_name</span><span class=p>()</span> <span class=p>{</span> <span class=k>return</span> <span class=s>&#34;u8&#34;</span><span class=p>;</span> <span class=p>}</span>
+</span></span><span class=line><span class=cl><span class=p>};</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=c1>// 偏特化：int16_t
+</span></span></span><span class=line><span class=cl><span class=c1></span><span class=k>template</span> <span class=o>&lt;&gt;</span>
+</span></span><span class=line><span class=cl><span class=k>struct</span> <span class=nc>TypeTraits</span><span class=o>&lt;</span><span class=kt>int16_t</span><span class=o>&gt;</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>  <span class=k>static</span> <span class=n>std</span><span class=o>::</span><span class=n>string</span> <span class=n>name</span><span class=p>()</span>       <span class=p>{</span> <span class=k>return</span> <span class=s>&#34;signed 16-bit integer&#34;</span><span class=p>;</span> <span class=p>}</span>
+</span></span><span class=line><span class=cl>  <span class=k>static</span> <span class=n>std</span><span class=o>::</span><span class=n>string</span> <span class=n>short_name</span><span class=p>()</span> <span class=p>{</span> <span class=k>return</span> <span class=s>&#34;i16&#34;</span><span class=p>;</span> <span class=p>}</span>
+</span></span><span class=line><span class=cl><span class=p>};</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=c1>// 偏特化：float
+</span></span></span><span class=line><span class=cl><span class=c1></span><span class=k>template</span> <span class=o>&lt;&gt;</span>
+</span></span><span class=line><span class=cl><span class=k>struct</span> <span class=nc>TypeTraits</span><span class=o>&lt;</span><span class=kt>float</span><span class=o>&gt;</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>  <span class=k>static</span> <span class=n>std</span><span class=o>::</span><span class=n>string</span> <span class=n>name</span><span class=p>()</span>       <span class=p>{</span> <span class=k>return</span> <span class=s>&#34;32-bit floating point&#34;</span><span class=p>;</span> <span class=p>}</span>
+</span></span><span class=line><span class=cl>  <span class=k>static</span> <span class=n>std</span><span class=o>::</span><span class=n>string</span> <span class=n>short_name</span><span class=p>()</span> <span class=p>{</span> <span class=k>return</span> <span class=s>&#34;f32&#34;</span><span class=p>;</span> <span class=p>}</span>
+</span></span><span class=line><span class=cl><span class=p>};</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=c1>// …其他基础类型的特化…
+</span></span></span></code></pre></td></tr></table></div></div><ul><li><p><strong>对外接口</strong>：</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt>1
+</span><span class=lnt>2
+</span><span class=lnt>3
+</span><span class=lnt>4
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-cpp data-lang=cpp><span class=line><span class=cl><span class=k>template</span><span class=o>&lt;</span><span class=k>typename</span> <span class=n>T</span><span class=o>&gt;</span>
+</span></span><span class=line><span class=cl><span class=n>std</span><span class=o>::</span><span class=n>string</span> <span class=n>TypeFactory</span><span class=o>::</span><span class=n>getTypeShortName</span><span class=p>()</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>  <span class=k>return</span> <span class=n>TypeTraits</span><span class=o>&lt;</span><span class=n>T</span><span class=o>&gt;::</span><span class=n>short_name</span><span class=p>();</span>
+</span></span><span class=line><span class=cl><span class=p>}</span>
+</span></span></code></pre></td></tr></table></div></div></li></ul><h4 id=152-appstatepeekt-与-readt>1.5.2 <code>AppState::peek&lt;T>()</code> 与 <code>read&lt;T>()</code></h4><ul><li><p><code>peek&lt;T>(pos)</code>：</p><ul><li>从 <code>data_</code> 中读取 <code>sizeof(T)</code> 字节并根据小端或大端转换为类型 <code>T</code>。</li><li>只做“查看”不修改光标。</li></ul></li><li><p><code>read&lt;T>(pos)</code>：</p><ul><li>调用 <code>peek&lt;T>(pos)</code> 获取值；</li><li>将 <code>(pos, value, 类型名称)</code> 封装成 <code>Record</code> 并压入 <code>read_history</code>；</li><li>将 <code>cursor_pos_</code> 往前移动 <code>sizeof(T)</code> 字节；</li><li>更新 <code>status_msg_</code> 并返回 <code>value</code>。</li></ul></li></ul><p>利用模板，<code>AppState::peek&lt;T></code> / <code>AppState::read&lt;T></code> 对不同基础类型无需写分支，统一由编译器根据 <code>T</code> 自动生成对应代码。</p><hr><h2 id=各模块与模式对应关系>各模块与模式对应关系</h2><div class=table-wrapper><table><thead><tr><th>模块 / 类</th><th>设计模式</th><th>说明</th></tr></thead><tbody><tr><td><code>TypeFactory</code></td><td>Singleton + Factory</td><td>单例：全局只维护一份“类型映射”。<br>工厂：完成“类型名 → std::type_index” 的注册与查询。</td></tr><tr><td><code>ReaderFactory</code></td><td>Singleton + Factory</td><td>单例：全局只维护一份“读取器映射”。<br>工厂：完成“类型名 → ReaderStrategy” 的注册与查询。</td></tr><tr><td><code>ReaderStrategy</code></td><td>Strategy</td><td>算法接口：定义 <code>bool read(AppState&, std::string)</code>；</td></tr><tr><td><code>TypedReader&lt;T></code></td><td>Strategy + Template</td><td>具体策略：读取基础类型 <code>T</code>。模板化：根据 <code>T</code> 不同自动生成不同的读取逻辑。</td></tr><tr><td><code>FixStringReader</code></td><td>Strategy</td><td>具体策略：读取固定长度的 C 字符串。构造时传入固定长度 <code>length</code>。</td></tr><tr><td><code>LengthPrefixedStringReader&lt;LengthType></code></td><td>Strategy + Template</td><td>具体策略：读取“长度前缀字符串（LengthType 表示前缀宽度）”。</td></tr><tr><td><code>AppState</code></td><td>Memento + Template</td><td>原发器 & 管理者：每次读取前将状态封装成 <code>Record</code> 存入栈；支持 <code>peek&lt;T>()</code>、<code>read&lt;T>()</code>、<code>undo()</code>。模板化读取减少重复。</td></tr><tr><td><code>Record</code></td><td>Memento</td><td>备忘录：保存“读取前的光标位置 + 读取到的数据 + 类型名称”，由 <code>AppState</code> 在每次读取时创建并压入 <code>read_history</code> 栈中；<code>undo()</code> 时弹出并恢复。</td></tr><tr><td><code>TypeTraits&lt;T></code></td><td>Traits</td><td>类型特征：在编译期将基础类型 <code>T</code> 与其“标准名称（name）”和“简短名称（short_name）”关联，为 <code>TypeFactory</code> 提供映射支持。</td></tr><tr><td><strong>其他辅助</strong></td><td><strong>RAII / STL 容器 / 智能指针</strong></td><td>代码中大量使用 <code>std::unique_ptr&lt;ReaderStrategy></code>、<code>std::vector&lt;uint8_t></code>、<code>std::stack&lt;Record></code> 等，均遵循 RAII 思想，无需手动管理内存。</td></tr></tbody></table></div><hr><h2 id=mermaid-类图>Mermaid 类图</h2><p>下面是一张以 Mermaid 语法编写的类图，将各主要类及其关系直观展现。只需将以下代码块复制到 GitHub 仓库的 Markdown 文件中即可自动渲染：</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span><span class=lnt>11
+</span><span class=lnt>12
+</span><span class=lnt>13
+</span><span class=lnt>14
+</span><span class=lnt>15
+</span><span class=lnt>16
+</span><span class=lnt>17
+</span><span class=lnt>18
+</span><span class=lnt>19
+</span><span class=lnt>20
+</span><span class=lnt>21
+</span><span class=lnt>22
+</span><span class=lnt>23
+</span><span class=lnt>24
+</span><span class=lnt>25
+</span><span class=lnt>26
+</span><span class=lnt>27
+</span><span class=lnt>28
+</span><span class=lnt>29
+</span><span class=lnt>30
+</span><span class=lnt>31
+</span><span class=lnt>32
+</span><span class=lnt>33
+</span><span class=lnt>34
+</span><span class=lnt>35
+</span><span class=lnt>36
+</span><span class=lnt>37
+</span><span class=lnt>38
+</span><span class=lnt>39
+</span><span class=lnt>40
+</span><span class=lnt>41
+</span><span class=lnt>42
+</span><span class=lnt>43
+</span><span class=lnt>44
+</span><span class=lnt>45
+</span><span class=lnt>46
+</span><span class=lnt>47
+</span><span class=lnt>48
+</span><span class=lnt>49
+</span><span class=lnt>50
+</span><span class=lnt>51
+</span><span class=lnt>52
+</span><span class=lnt>53
+</span><span class=lnt>54
+</span><span class=lnt>55
+</span><span class=lnt>56
+</span><span class=lnt>57
+</span><span class=lnt>58
+</span><span class=lnt>59
+</span><span class=lnt>60
+</span><span class=lnt>61
+</span><span class=lnt>62
+</span><span class=lnt>63
+</span><span class=lnt>64
+</span><span class=lnt>65
+</span><span class=lnt>66
+</span><span class=lnt>67
+</span><span class=lnt>68
+</span><span class=lnt>69
+</span><span class=lnt>70
+</span><span class=lnt>71
+</span><span class=lnt>72
+</span><span class=lnt>73
+</span><span class=lnt>74
+</span><span class=lnt>75
+</span><span class=lnt>76
+</span><span class=lnt>77
+</span><span class=lnt>78
+</span><span class=lnt>79
+</span><span class=lnt>80
+</span><span class=lnt>81
+</span><span class=lnt>82
+</span><span class=lnt>83
+</span><span class=lnt>84
+</span><span class=lnt>85
+</span><span class=lnt>86
+</span><span class=lnt>87
+</span><span class=lnt>88
+</span><span class=lnt>89
+</span><span class=lnt>90
+</span><span class=lnt>91
+</span><span class=lnt>92
+</span><span class=lnt>93
+</span><span class=lnt>94
+</span><span class=lnt>95
+</span><span class=lnt>96
+</span><span class=lnt>97
+</span><span class=lnt>98
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-gdscript3 data-lang=gdscript3><span class=line><span class=cl><span class=n>classDiagram</span>
+</span></span><span class=line><span class=cl>    <span class=o>%%</span> <span class=o>================================</span>
+</span></span><span class=line><span class=cl>    <span class=o>%%</span> <span class=err>单例工厂：</span><span class=n>TypeFactory</span>
+</span></span><span class=line><span class=cl>    <span class=o>%%</span> <span class=o>================================</span>
+</span></span><span class=line><span class=cl>    <span class=k>class</span> <span class=n>TypeFactory</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>      <span class=o>&lt;&lt;</span><span class=n>Singleton</span><span class=o>&gt;&gt;</span>
+</span></span><span class=line><span class=cl>      <span class=o>-</span> <span class=n>std</span><span class=p>::</span><span class=n>unordered_map</span><span class=o>&lt;</span><span class=n>std</span><span class=p>::</span><span class=n>string</span><span class=p>,</span> <span class=n>std</span><span class=p>::</span><span class=n>type_index</span><span class=o>&gt;</span> <span class=n>type_map_</span>
+</span></span><span class=line><span class=cl>      <span class=o>+</span> <span class=k>static</span> <span class=n>TypeFactory</span><span class=o>&amp;</span> <span class=n>instance</span><span class=p>()</span>
+</span></span><span class=line><span class=cl>      <span class=o>+</span> <span class=n>std</span><span class=p>::</span><span class=n>type_index</span> <span class=n>getTypeIndex</span><span class=p>(</span><span class=k>const</span> <span class=n>std</span><span class=p>::</span><span class=n>string</span><span class=o>&amp;</span> <span class=n>shortName</span><span class=p>)</span> <span class=k>const</span>
+</span></span><span class=line><span class=cl>      <span class=o>+</span> <span class=n>template</span><span class=o>&lt;</span><span class=n>typename</span> <span class=n>T</span><span class=o>&gt;</span> <span class=k>static</span> <span class=n>std</span><span class=p>::</span><span class=n>string</span> <span class=n>getTypeShortName</span><span class=p>()</span>
+</span></span><span class=line><span class=cl>    <span class=p>}</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>    <span class=o>%%</span> <span class=o>================================</span>
+</span></span><span class=line><span class=cl>    <span class=o>%%</span> <span class=err>单例工厂：</span><span class=n>ReaderFactory</span>
+</span></span><span class=line><span class=cl>    <span class=o>%%</span> <span class=o>================================</span>
+</span></span><span class=line><span class=cl>    <span class=k>class</span> <span class=n>ReaderFactory</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>      <span class=o>&lt;&lt;</span><span class=n>Singleton</span><span class=o>&gt;&gt;</span>
+</span></span><span class=line><span class=cl>      <span class=o>-</span> <span class=n>std</span><span class=p>::</span><span class=n>unordered_map</span><span class=o>&lt;</span><span class=n>std</span><span class=p>::</span><span class=n>string</span><span class=p>,</span> <span class=n>ReaderStrategy</span><span class=o>*&gt;</span> <span class=n>readers_</span>
+</span></span><span class=line><span class=cl>      <span class=o>+</span> <span class=k>static</span> <span class=n>ReaderFactory</span><span class=o>&amp;</span> <span class=n>instance</span><span class=p>()</span>
+</span></span><span class=line><span class=cl>      <span class=o>+</span> <span class=ne>bool</span> <span class=n>read</span><span class=p>(</span><span class=n>AppState</span><span class=o>&amp;</span> <span class=n>state</span><span class=p>,</span> <span class=k>const</span> <span class=n>std</span><span class=p>::</span><span class=n>string</span><span class=o>&amp;</span> <span class=n>typeName</span><span class=p>)</span> <span class=k>const</span>
+</span></span><span class=line><span class=cl>      <span class=o>+</span> <span class=n>template</span><span class=o>&lt;</span><span class=n>typename</span> <span class=n>T</span><span class=o>&gt;</span> <span class=n>void</span> <span class=n>emplaceReader</span><span class=p>(</span><span class=k>const</span> <span class=n>std</span><span class=p>::</span><span class=n>string</span><span class=o>&amp;</span> <span class=n>shortName</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>    <span class=p>}</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>    <span class=o>%%</span> <span class=o>================================</span>
+</span></span><span class=line><span class=cl>    <span class=o>%%</span> <span class=err>策略接口：</span><span class=n>ReaderStrategy</span>
+</span></span><span class=line><span class=cl>    <span class=o>%%</span> <span class=o>================================</span>
+</span></span><span class=line><span class=cl>    <span class=k>class</span> <span class=n>ReaderStrategy</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>      <span class=o>&lt;&lt;</span><span class=n>Interface</span><span class=o>&gt;&gt;</span>
+</span></span><span class=line><span class=cl>      <span class=o>&lt;&lt;</span><span class=n>abstract</span><span class=o>&gt;&gt;</span>
+</span></span><span class=line><span class=cl>      <span class=o>+</span> <span class=n>virtual</span> <span class=ne>bool</span> <span class=n>read</span><span class=p>(</span><span class=n>AppState</span><span class=o>&amp;</span> <span class=n>state</span><span class=p>,</span> <span class=n>std</span><span class=p>::</span><span class=n>string</span> <span class=n>typeName</span><span class=p>)</span> <span class=k>const</span> <span class=o>=</span> <span class=mi>0</span>
+</span></span><span class=line><span class=cl>    <span class=p>}</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>    <span class=o>%%</span> <span class=o>================================</span>
+</span></span><span class=line><span class=cl>    <span class=o>%%</span> <span class=err>具体策略：</span><span class=n>TypedReader</span><span class=o>&lt;</span><span class=n>T</span><span class=o>&gt;</span>
+</span></span><span class=line><span class=cl>    <span class=o>%%</span> <span class=o>================================</span>
+</span></span><span class=line><span class=cl>    <span class=k>class</span> <span class=n>TypedReader</span><span class=o>~</span><span class=n>T</span><span class=o>~</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>      <span class=o>+</span> <span class=ne>bool</span> <span class=n>read</span><span class=p>(</span><span class=n>AppState</span><span class=o>&amp;</span> <span class=n>state</span><span class=p>,</span> <span class=n>std</span><span class=p>::</span><span class=n>string</span> <span class=n>typeName</span><span class=p>)</span> <span class=k>const</span>
+</span></span><span class=line><span class=cl>    <span class=p>}</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>    <span class=o>%%</span> <span class=o>================================</span>
+</span></span><span class=line><span class=cl>    <span class=o>%%</span> <span class=err>具体策略：</span><span class=n>FixStringReader</span>
+</span></span><span class=line><span class=cl>    <span class=o>%%</span> <span class=o>================================</span>
+</span></span><span class=line><span class=cl>    <span class=k>class</span> <span class=n>FixStringReader</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>      <span class=o>-</span> <span class=n>size_t</span> <span class=n>length_</span>
+</span></span><span class=line><span class=cl>      <span class=o>+</span> <span class=n>FixStringReader</span><span class=p>(</span><span class=n>size_t</span> <span class=n>len</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>      <span class=o>+</span> <span class=ne>bool</span> <span class=n>read</span><span class=p>(</span><span class=n>AppState</span><span class=o>&amp;</span> <span class=n>state</span><span class=p>,</span> <span class=n>std</span><span class=p>::</span><span class=n>string</span> <span class=n>typeName</span><span class=p>)</span> <span class=k>const</span>
+</span></span><span class=line><span class=cl>    <span class=p>}</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>    <span class=o>%%</span> <span class=o>================================</span>
+</span></span><span class=line><span class=cl>    <span class=o>%%</span> <span class=err>具体策略：</span><span class=n>LengthPrefixedStringReader</span><span class=o>&lt;</span><span class=n>LengthType</span><span class=o>&gt;</span>
+</span></span><span class=line><span class=cl>    <span class=o>%%</span> <span class=o>================================</span>
+</span></span><span class=line><span class=cl>    <span class=k>class</span> <span class=n>LengthPrefixedStringReader</span><span class=o>~</span><span class=n>LengthType</span><span class=o>~</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>      <span class=o>+</span> <span class=ne>bool</span> <span class=n>read</span><span class=p>(</span><span class=n>AppState</span><span class=o>&amp;</span> <span class=n>state</span><span class=p>,</span> <span class=n>std</span><span class=p>::</span><span class=n>string</span> <span class=n>typeName</span><span class=p>)</span> <span class=k>const</span>
+</span></span><span class=line><span class=cl>    <span class=p>}</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>    <span class=o>%%</span> <span class=o>================================</span>
+</span></span><span class=line><span class=cl>    <span class=o>%%</span> <span class=n>AppState</span> <span class=err>与</span> <span class=err>备忘录：</span><span class=n>Record</span>
+</span></span><span class=line><span class=cl>    <span class=o>%%</span> <span class=o>================================</span>
+</span></span><span class=line><span class=cl>    <span class=k>class</span> <span class=n>AppState</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>      <span class=o>-</span> <span class=n>size_t</span> <span class=n>cursor_pos_</span>
+</span></span><span class=line><span class=cl>      <span class=o>-</span> <span class=n>std</span><span class=p>::</span><span class=n>stack</span><span class=o>~</span><span class=n>Record</span><span class=o>~</span> <span class=n>read_history</span>
+</span></span><span class=line><span class=cl>      <span class=o>+</span> <span class=n>template</span><span class=o>&lt;</span><span class=n>typename</span> <span class=n>T</span><span class=o>&gt;</span> <span class=n>T</span> <span class=n>peek</span><span class=p>(</span><span class=n>size_t</span> <span class=n>pos</span><span class=p>)</span> <span class=k>const</span>
+</span></span><span class=line><span class=cl>      <span class=o>+</span> <span class=n>template</span><span class=o>&lt;</span><span class=n>typename</span> <span class=n>T</span><span class=o>&gt;</span> <span class=n>T</span> <span class=n>read</span><span class=p>(</span><span class=n>size_t</span> <span class=n>pos</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>      <span class=o>+</span> <span class=n>void</span> <span class=n>undo</span><span class=p>()</span>
+</span></span><span class=line><span class=cl>      <span class=o>+</span> <span class=n>size_t</span> <span class=n>getCursorPos</span><span class=p>()</span> <span class=k>const</span>
+</span></span><span class=line><span class=cl>      <span class=o>+</span> <span class=n>void</span> <span class=n>setCursorPos</span><span class=p>(</span><span class=n>size_t</span> <span class=n>pos</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>      <span class=o>+</span> <span class=n>std</span><span class=p>::</span><span class=n>string</span> <span class=n>getStatusMsg</span><span class=p>()</span> <span class=k>const</span>
+</span></span><span class=line><span class=cl>    <span class=p>}</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>    <span class=k>class</span> <span class=n>Record</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>      <span class=o>-</span> <span class=n>size_t</span> <span class=n>index</span>
+</span></span><span class=line><span class=cl>      <span class=o>-</span> <span class=n>std</span><span class=p>::</span><span class=n>any</span> <span class=n>data</span>
+</span></span><span class=line><span class=cl>      <span class=o>-</span> <span class=n>std</span><span class=p>::</span><span class=n>string</span> <span class=n>type_name</span>
+</span></span><span class=line><span class=cl>      <span class=o>+</span> <span class=n>Record</span><span class=p>(</span><span class=n>size_t</span> <span class=n>idx</span><span class=p>,</span> <span class=n>std</span><span class=p>::</span><span class=n>any</span> <span class=n>d</span><span class=p>,</span> <span class=k>const</span> <span class=n>std</span><span class=p>::</span><span class=n>string</span><span class=o>&amp;</span> <span class=n>t</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>      <span class=o>+</span> <span class=n>std</span><span class=p>::</span><span class=n>string</span> <span class=n>description</span><span class=p>()</span> <span class=k>const</span>
+</span></span><span class=line><span class=cl>    <span class=p>}</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>    <span class=o>%%</span> <span class=o>================================</span>
+</span></span><span class=line><span class=cl>    <span class=o>%%</span> <span class=err>类型特征：</span><span class=n>TypeTraits</span><span class=o>&lt;</span><span class=n>T</span><span class=o>&gt;</span>
+</span></span><span class=line><span class=cl>    <span class=o>%%</span> <span class=o>================================</span>
+</span></span><span class=line><span class=cl>    <span class=k>class</span> <span class=n>TypeTraits</span><span class=o>~</span><span class=n>T</span><span class=o>~</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>      <span class=o>&lt;&lt;</span><span class=n>interface</span><span class=o>&gt;&gt;</span>
+</span></span><span class=line><span class=cl>      <span class=o>+</span> <span class=k>static</span> <span class=n>std</span><span class=p>::</span><span class=n>string</span> <span class=n>name</span><span class=p>()</span>
+</span></span><span class=line><span class=cl>      <span class=o>+</span> <span class=k>static</span> <span class=n>std</span><span class=p>::</span><span class=n>string</span> <span class=n>short_name</span><span class=p>()</span>
+</span></span><span class=line><span class=cl>    <span class=p>}</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>    <span class=o>%%</span> <span class=o>================================</span>
+</span></span><span class=line><span class=cl>    <span class=o>%%</span> <span class=err>类之间关系</span>
+</span></span><span class=line><span class=cl>    <span class=o>%%</span> <span class=o>================================</span>
+</span></span><span class=line><span class=cl>    <span class=n>TypeFactory</span> <span class=o>--&gt;</span> <span class=s2>&#34;uses&#34;</span> <span class=n>TypeTraits</span><span class=o>~</span><span class=n>T</span><span class=o>~</span>
+</span></span><span class=line><span class=cl>    <span class=n>ReaderFactory</span> <span class=o>--&gt;</span> <span class=n>ReaderStrategy</span> <span class=p>:</span> <span class=n>maintains</span> <span class=o>&gt;</span>
+</span></span><span class=line><span class=cl>    <span class=n>ReaderFactory</span> <span class=o>--&gt;</span> <span class=n>TypeFactory</span> <span class=p>:</span> <span class=n>uses</span> <span class=o>&gt;</span>
+</span></span><span class=line><span class=cl>    <span class=n>TypedReader</span><span class=o>~</span><span class=n>T</span><span class=o>~</span> <span class=o>..|&gt;</span> <span class=n>ReaderStrategy</span> <span class=p>:</span> <span class=n>implements</span>
+</span></span><span class=line><span class=cl>    <span class=n>FixStringReader</span> <span class=o>..|&gt;</span> <span class=n>ReaderStrategy</span> <span class=p>:</span> <span class=n>implements</span>
+</span></span><span class=line><span class=cl>    <span class=n>LengthPrefixedStringReader</span><span class=o>~</span><span class=n>LengthType</span><span class=o>~</span> <span class=o>..|&gt;</span> <span class=n>ReaderStrategy</span> <span class=p>:</span> <span class=n>implements</span>
+</span></span><span class=line><span class=cl>    <span class=n>AppState</span> <span class=o>--&gt;</span> <span class=n>Record</span> <span class=p>:</span> <span class=n>writes</span> <span class=n>to</span> <span class=o>&gt;</span>
+</span></span><span class=line><span class=cl>    <span class=n>AppState</span> <span class=o>--&gt;</span> <span class=n>ReaderFactory</span> <span class=p>:</span> <span class=n>calls</span> <span class=o>&gt;</span>
+</span></span><span class=line><span class=cl>    <span class=n>Record</span> <span class=o>..|&gt;</span> <span class=n>Memento</span> <span class=p>:</span> <span class=p>(</span><span class=n>pattern</span> <span class=n>role</span><span class=p>)</span>
+</span></span></code></pre></td></tr></table></div></div><p><strong>说明：</strong></p><ul><li><code>&lt;&lt;Singleton>></code> 表示单例类；</li><li><code>&lt;&lt;Interface>></code> 表示策略接口；</li><li>模板类用 <code>~T~</code> 或 <code>~LengthType~</code> 表示泛型参数；</li><li>箭头 <code>--></code> 表示依赖或使用关系；</li><li>实线半空心箭头 <code>..|></code> 表示继承或实现关系；</li><li><code>Memento</code> 仅作模式角色标注，无对应实际 C++ 类。</li></ul><hr><h2 id=整体架构与总结>整体架构与总结</h2><ol><li><p><strong>解耦与可扩展</strong></p><ul><li><p>通过 <strong>单例 + 工厂模式</strong>，将“类型注册”、“读取器注册”、“具体读取逻辑”集中管理：</p><ul><li>要新增基础类型，只需在 <code>TypeFactory</code> 中注册；</li><li>要新增读取方式，只需继承 <code>ReaderStrategy</code> 并在 <code>ReaderFactory</code> 注册。</li></ul></li><li><p>客户端（通常是 UI 或命令行解析）只需调用：</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt>1
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-cpp data-lang=cpp><span class=line><span class=cl><span class=kt>bool</span> <span class=n>ok</span> <span class=o>=</span> <span class=n>ReaderFactory</span><span class=o>::</span><span class=n>instance</span><span class=p>().</span><span class=n>read</span><span class=p>(</span><span class=n>state</span><span class=p>,</span> <span class=n>typeName</span><span class=p>);</span>
+</span></span></code></pre></td></tr></table></div></div><p>即可完成从字节流中解析“类型为 typeName 的数据”。整个流程对客户端透明，无需了解内部实现细节。</p></li></ul></li><li><p><strong>可撤销的读取（Undo）</strong></p><ul><li>通过 <strong>备忘录模式</strong>，每次读取前将当前光标位置和将要读取的数据值打包成 <code>Record</code> 并压入栈中。</li><li>用户若需撤销，只需调用 <code>AppState::undo()</code>，即可将光标回退到上一次读取前的位置，并在状态消息里提示 “Undo to …”。</li><li>可以轻松扩展为多级撤销、Redo（只需另维护一个“重做栈”）等。</li></ul></li><li><p><strong>模板与类型特征</strong></p><ul><li><code>TypeTraits&lt;T></code> 在编译期将 <code>T</code> 与其名称绑定，配合 <code>TypeFactory</code> 实现“类型名称 ↔ typeid” 的双向映射。</li><li><code>AppState::peek&lt;T>()</code> / <code>read&lt;T>()</code> 与 <code>TypedReader&lt;T></code>，利用模板自动生成不同数据宽度的读取代码，避免了手写大量类似的函数。</li><li>如果需要在不同字节序（小端/大端）之间切换，只需在 <code>peek&lt;T>()</code> 内添加条件分支或再提供另一个 <code>EndianTraits</code> 即可。</li></ul></li><li><p><strong>整体调用流程示例</strong></p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span><span class=lnt>11
+</span><span class=lnt>12
+</span><span class=lnt>13
+</span><span class=lnt>14
+</span><span class=lnt>15
+</span><span class=lnt>16
+</span><span class=lnt>17
+</span><span class=lnt>18
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-cpp data-lang=cpp><span class=line><span class=cl><span class=c1>// 假设 dataVec 存放了待解析的二进制数据
+</span></span></span><span class=line><span class=cl><span class=c1></span><span class=n>AppState</span> <span class=nf>state</span><span class=p>(</span><span class=n>dataVec</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=c1>// 用户想读取一个 16 位带符号整数 (i16)：
+</span></span></span><span class=line><span class=cl><span class=c1></span><span class=k>if</span> <span class=p>(</span><span class=n>ReaderFactory</span><span class=o>::</span><span class=n>instance</span><span class=p>().</span><span class=n>read</span><span class=p>(</span><span class=n>state</span><span class=p>,</span> <span class=s>&#34;i16&#34;</span><span class=p>))</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>  <span class=n>std</span><span class=o>::</span><span class=n>cout</span> <span class=o>&lt;&lt;</span> <span class=n>state</span><span class=p>.</span><span class=n>getStatusMsg</span><span class=p>()</span> <span class=o>&lt;&lt;</span> <span class=n>std</span><span class=o>::</span><span class=n>endl</span><span class=p>;</span>
+</span></span><span class=line><span class=cl><span class=p>}</span> <span class=k>else</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>  <span class=n>std</span><span class=o>::</span><span class=n>cout</span> <span class=o>&lt;&lt;</span> <span class=s>&#34;无法解析类型 i16&#34;</span> <span class=o>&lt;&lt;</span> <span class=n>std</span><span class=o>::</span><span class=n>endl</span><span class=p>;</span>
+</span></span><span class=line><span class=cl><span class=p>}</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=c1>// 继续读取一个长度前缀字符串 (string@u16)：
+</span></span></span><span class=line><span class=cl><span class=c1></span><span class=k>if</span> <span class=p>(</span><span class=n>ReaderFactory</span><span class=o>::</span><span class=n>instance</span><span class=p>().</span><span class=n>read</span><span class=p>(</span><span class=n>state</span><span class=p>,</span> <span class=s>&#34;string@u16&#34;</span><span class=p>))</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>  <span class=n>std</span><span class=o>::</span><span class=n>cout</span> <span class=o>&lt;&lt;</span> <span class=n>state</span><span class=p>.</span><span class=n>getStatusMsg</span><span class=p>()</span> <span class=o>&lt;&lt;</span> <span class=n>std</span><span class=o>::</span><span class=n>endl</span><span class=p>;</span>
+</span></span><span class=line><span class=cl><span class=p>}</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=c1>// 如果发生了误操作，用户想撤销最近一次读取：
+</span></span></span><span class=line><span class=cl><span class=c1></span><span class=n>state</span><span class=p>.</span><span class=n>undo</span><span class=p>();</span>
+</span></span><span class=line><span class=cl><span class=n>std</span><span class=o>::</span><span class=n>cout</span> <span class=o>&lt;&lt;</span> <span class=n>state</span><span class=p>.</span><span class=n>getStatusMsg</span><span class=p>()</span> <span class=o>&lt;&lt;</span> <span class=n>std</span><span class=o>::</span><span class=n>endl</span><span class=p>;</span>  <span class=c1>// 输出类似 &#34;Undo to i16 @ 0x02&#34;
+</span></span></span></code></pre></td></tr></table></div></div></li><li><p><strong>优势与扩展思路</strong></p><ul><li><strong>新增类型/读取方式</strong>：在 <code>TypeFactory</code> 或 <code>ReaderFactory</code> 中添加注册逻辑即可，无需改动客户端调用。</li><li><strong>支持更多复杂读取</strong>：如果想读取压缩整数（varint）、位域（bitfield）或自定义协议，只需新建子类继承 <code>ReaderStrategy</code>，并在工厂里注册。</li><li><strong>可重做（Redo）功能</strong>：只要在 <code>undo()</code> 中将弹出的 <code>Record</code> 同时推入一个“重做栈”，再实现 <code>redo()</code> 即可。</li><li><strong>可视化/调试</strong>：通过 <code>AppState::getReadHistory()</code> 获取完整的读取记录栈，可输出到日志或在 GUI 中展示。</li><li><strong>跨平台字节序</strong>：如果需要兼容大端机器，可在 <code>peek&lt;T>()</code> 中根据运行时判断或模板参数做相应调整。</li></ul></li></ol><hr><blockquote><p><strong>本文所有代码示例均可在 C++11 以上版本下编译运行。</strong>
+若使用更高版本（C++17、C++20），可结合 <code>std::byte</code>、<code>std::variant</code>、<code>std::optional</code> 等特性，进一步优化类型安全和可读性。</p></blockquote><hr><p><em>作者：xinchen</em>
+<em>首次发布日期：2025-05-25</em>
+<em>版权所有 © 2025</em>
+<em>作者信息：af83f787e8911dea9b3bf677746ebac9</em></p></section><footer class=article-footer><section class=article-tags><a href=/note/tags/%E5%8D%95%E4%BE%8B%E6%A8%A1%E5%BC%8F/>单例模式</a>
+<a href=/note/tags/%E5%B7%A5%E5%8E%82%E6%A8%A1%E5%BC%8F/>工厂模式</a>
+<a href=/note/tags/%E7%AD%96%E7%95%A5%E6%A8%A1%E5%BC%8F/>策略模式</a>
+<a href=/note/tags/%E5%A4%87%E5%BF%98%E5%BD%95%E6%A8%A1%E5%BC%8F/>备忘录模式</a></section><section class=article-copyright><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-copyright" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><circle cx="12" cy="12" r="9"/><path d="M14.5 9a3.5 4 0 100 6"/></svg>
+<span>Licensed under CC BY-NC-SA 4.0</span></section></footer></article><div class=disqus-container><div id=disqus_thread></div><script>window.disqus_config=function(){},function(){if(["localhost","127.0.0.1"].indexOf(window.location.hostname)!=-1){document.getElementById("disqus_thread").innerHTML="Disqus comments not available by default when the website is previewed locally.";return}var t=document,e=t.createElement("script");e.async=!0,e.src="//hugo-theme-stack.disqus.com/embed.js",e.setAttribute("data-timestamp",+new Date),(t.head||t.body).appendChild(e)}()</script><noscript>Please enable JavaScript to view the <a href=https://disqus.com/?ref_noscript>comments powered by Disqus.</a></noscript><a href=https://disqus.com class=dsq-brlink>comments powered by <span class=logo-disqus>Disqus</span></a></div><style>.disqus-container{background-color:var(--card-background);border-radius:var(--card-border-radius);box-shadow:var(--shadow-l1);padding:var(--card-padding)}</style><script>window.addEventListener("onColorSchemeChange",e=>{typeof DISQUS=="object"&&DISQUS.reset({reload:!0})})</script><footer class=site-footer><section class=copyright>&copy;
+2025 xinchen</section><section class=powerby>使用 <a href=https://gohugo.io/ target=_blank rel=noopener>Hugo</a> 构建<br>主题 <b><a href=https://github.com/CaiJimmy/hugo-theme-stack target=_blank rel=noopener data-version=3.30.0>Stack</a></b> 由 <a href=https://jimmycai.com target=_blank rel=noopener>Jimmy</a> 设计</section></footer><div class=pswp tabindex=-1 role=dialog aria-hidden=true><div class=pswp__bg></div><div class=pswp__scroll-wrap><div class=pswp__container><div class=pswp__item></div><div class=pswp__item></div><div class=pswp__item></div></div><div class="pswp__ui pswp__ui--hidden"><div class=pswp__top-bar><div class=pswp__counter></div><button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+<button class="pswp__button pswp__button--share" title=Share></button>
+<button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+<button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button><div class=pswp__preloader><div class=pswp__preloader__icn><div class=pswp__preloader__cut><div class=pswp__preloader__donut></div></div></div></div></div><div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap"><div class=pswp__share-tooltip></div></div><button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+</button>
+<button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)"></button><div class=pswp__caption><div class=pswp__caption__center></div></div></div></div></div><script src=https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo=" crossorigin=anonymous defer></script><script src=https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU=" crossorigin=anonymous defer></script><link rel=stylesheet href=https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css crossorigin=anonymous><link rel=stylesheet href=https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css crossorigin=anonymous></main></div><script src=https://cdn.jsdelivr.net/npm/node-vibrant@3.1.6/dist/vibrant.min.js integrity="sha256-awcR2jno4kI5X0zL8ex0vi2z+KMkF24hUW8WePSA9HM=" crossorigin=anonymous></script><script type=text/javascript src=/note/ts/main.1e9a3bafd846ced4c345d084b355fb8c7bae75701c338f8a1f8a82c780137826.js defer></script><script>(function(){const e=document.createElement("link");e.href="https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap",e.type="text/css",e.rel="stylesheet",document.head.appendChild(e)})()</script></body></html>
