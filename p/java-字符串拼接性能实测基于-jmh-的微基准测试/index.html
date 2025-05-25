@@ -234,7 +234,11 @@
 </span></span></span><span class=line><span class=cl><span class=w></span><span class=nd>@Fork</span><span class=p>(</span><span class=n>1</span><span class=p>)</span><span class=w>                                             </span><span class=c1>// 启动 1 次 JVM</span><span class=w>
 </span></span></span><span class=line><span class=cl><span class=w></span><span class=nd>@Warmup</span><span class=p>(</span><span class=n>iterations</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>5</span><span class=p>,</span><span class=w> </span><span class=n>time</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>1</span><span class=p>)</span><span class=w>                   </span><span class=c1>// 预热 5 次，每次 1 秒</span><span class=w>
 </span></span></span><span class=line><span class=cl><span class=w></span><span class=nd>@Measurement</span><span class=p>(</span><span class=n>iterations</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>5</span><span class=p>,</span><span class=w> </span><span class=n>time</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>1</span><span class=p>)</span><span class=w>              </span><span class=c1>// 采样 5 次，每次 1 秒</span><span class=w>
-</span></span></span></code></pre></td></tr></table></div></div><h4 id=为什么不能简单用-systemcurrenttimemillis>为什么不能简单用 System.currentTimeMillis？</h4><p>因为 JVM 启动初期 JIT 编译未完成、内联尚未展开、逃逸分析等优化机制尚未介入，初始运行的耗时非常不稳定。而 JMH 通过：</p><ul><li><p>自动 warm-up 预热阶段；</p></li><li><p>多轮 fork JVM 隔离优化影响；</p></li><li><p>统计误差和波动范围（Error）；</p></li></ul><p>确保了测得结果更真实、更接近应用实际表现。</p><hr><p>希望本文能为你在日常开发与性能优化中提供量化参考！</p></section><footer class=article-footer><section class=article-tags><a href=/note/tags/java/>Java</a>
+</span></span></span></code></pre></td></tr></table></div></div><h4 id=为什么不能简单用-systemcurrenttimemillis>为什么不能简单用 System.currentTimeMillis？</h4><p>因为 JVM 启动初期 JIT 编译未完成、内联尚未展开、逃逸分析等优化机制尚未介入，初始运行的耗时非常不稳定。而 JMH 通过：</p><ul><li><p>自动 warm-up 预热阶段；</p></li><li><p>多轮 fork JVM 隔离优化影响；</p></li><li><p>统计误差和波动范围（Error）；</p></li></ul><p>确保了测得结果更真实、更接近应用实际表现。</p><hr><p>希望本文能为你在日常开发与性能优化中提供量化参考！
+<em>作者：xinchen</em>
+<em>首次发布日期：2025-05-25</em>
+<em>版权所有 © 2025</em>
+<em>作者信息：af83f787e8911dea9b3bf677746ebac9</em></p></section><footer class=article-footer><section class=article-tags><a href=/note/tags/java/>Java</a>
 <a href=/note/tags/jmh/>JMH</a>
 <a href=/note/tags/benchmark/>Benchmark</a>
 <a href=/note/tags/string-concatenation/>String Concatenation</a>

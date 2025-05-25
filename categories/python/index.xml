@@ -1534,5 +1534,9 @@ alt="ByteBuf"
 >https://docs.oracle.com/javase/8/docs/api/java/nio/ByteBuffer.html&lt;/a>
 &lt;a class="link" href="https://docs.rs/bytes/1.1.0/bytes/" target="_blank" rel="noopener"
 >https://docs.rs/bytes/1.1.0/bytes/&lt;/a>&lt;/p>
+&lt;p>&lt;em>作者：xinchen&lt;/em>
+&lt;em>首次发布日期：2025-05-25&lt;/em>
+&lt;em>版权所有 © 2025&lt;/em>
+&lt;em>作者信息：af83f787e8911dea9b3bf677746ebac9&lt;/em>&lt;/p>
 &lt;h3 id="下期预告基于bytebuf实现对交易所交易接口消息的封装">&lt;em>下期预告&lt;/em>：基于Bytebuf实现对交易所交易接口消息的封装
 &lt;/h3></description></item></channel></rss>
