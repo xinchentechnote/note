@@ -3,7 +3,7 @@ relativeURLs: false
 languageCode: "zh-cn"
 title: "xinchentechnote"
 theme: hugo-theme-stack
-copyright: xinchen
+copyright: xinchen@af83f787e8911dea9b3bf677746ebac9
 
 # Theme i18n support
 # Available values: ar, bn, ca, de, el, en, es, fr, hu, id, it, ja, ko, nl, pt-br, th, uk, zh-cn, zh-hk, zh-tw
