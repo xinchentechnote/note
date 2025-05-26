@@ -1,0 +1,223 @@
+<!doctype html><html lang=zh-cn dir=ltr><head><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'><meta name=description content="Wireshark插件开发实战-Lua解析自定义二进制协议 在调试自定义 TCP 协议时，我们常常需要构造原始的二进制数据包并通过 Wireshark 进行抓包分析。这篇"><title>Wireshark插件开发实战-Lua解析自定义二进制协议</title>
+<link rel=canonical href=https://xinchentechnote.github.io/note/p/wireshark%E6%8F%92%E4%BB%B6%E5%BC%80%E5%8F%91%E5%AE%9E%E6%88%98-lua%E8%A7%A3%E6%9E%90%E8%87%AA%E5%AE%9A%E4%B9%89%E4%BA%8C%E8%BF%9B%E5%88%B6%E5%8D%8F%E8%AE%AE/><link rel=stylesheet href=/note/scss/style.min.663803bebe609202d5b39d848f2d7c2dc8b598a2d879efa079fa88893d29c49c.css><meta property='og:title' content="Wireshark插件开发实战-Lua解析自定义二进制协议"><meta property='og:description' content="Wireshark插件开发实战-Lua解析自定义二进制协议 在调试自定义 TCP 协议时，我们常常需要构造原始的二进制数据包并通过 Wireshark 进行抓包分析。这篇"><meta property='og:url' content='https://xinchentechnote.github.io/note/p/wireshark%E6%8F%92%E4%BB%B6%E5%BC%80%E5%8F%91%E5%AE%9E%E6%88%98-lua%E8%A7%A3%E6%9E%90%E8%87%AA%E5%AE%9A%E4%B9%89%E4%BA%8C%E8%BF%9B%E5%88%B6%E5%8D%8F%E8%AE%AE/'><meta property='og:site_name' content='歆晨技术笔记'><meta property='og:type' content='article'><meta property='article:section' content='Post'><meta property='article:tag' content='lua'><meta property='article:tag' content='wireshark'><meta property='article:tag' content='抓包分析'><meta property='article:tag' content='网络调试'><meta property='article:tag' content='插件开发'><meta property='article:tag' content='tcpdump'><meta property='article:published_time' content='2025-05-26T11:48:25+08:00'><meta property='article:modified_time' content='2025-05-26T11:48:25+08:00'><meta name=twitter:title content="Wireshark插件开发实战-Lua解析自定义二进制协议"><meta name=twitter:description content="Wireshark插件开发实战-Lua解析自定义二进制协议 在调试自定义 TCP 协议时，我们常常需要构造原始的二进制数据包并通过 Wireshark 进行抓包分析。这篇"><link rel="shortcut icon" href=/note/img/blog_logo.ico></head><body class=article-page><script>(function(){const e="StackColorScheme";localStorage.getItem(e)||localStorage.setItem(e,"auto")})()</script><script>(function(){const t="StackColorScheme",e=localStorage.getItem(t),n=window.matchMedia("(prefers-color-scheme: dark)").matches===!0;e=="dark"||e==="auto"&&n?document.documentElement.dataset.scheme="dark":document.documentElement.dataset.scheme="light"})()</script><div class="container main-container flex on-phone--column extended"><aside class="sidebar left-sidebar sticky"><button class="hamburger hamburger--spin" type=button id=toggle-menu aria-label=切换菜单>
+<span class=hamburger-box><span class=hamburger-inner></span></span></button><header><figure class=site-avatar><a href=/note/><img src=/note/img/blog_logo_mini_hue9dc5c3df039dac32d0c307c32594f46_187239_300x0_resize_box_3.png width=300 height=300 class=site-logo loading=lazy alt=Avatar></a></figure><div class=site-meta><h1 class=site-name><a href=/note>歆晨技术笔记</a></h1><h2 class=site-description>勿在浮沙筑高台，沉淀、记录个人的技术笔记与总结。现某金融科技公司开发人员，主要负责网络编程，涉及相关网关组件架构设计与重构，低时延性能优化等。</h2></div></header><ol class=menu-social><li><a href=https://github.com/CaiJimmy/hugo-theme-stack target=_blank title=GitHub rel=me><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-github" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M9 19c-4.3 1.4-4.3-2.5-6-3m12 5v-3.5c0-1 .1-1.4-.5-2 2.8-.3 5.5-1.4 5.5-6a4.6 4.6.0 00-1.3-3.2 4.2 4.2.0 00-.1-3.2s-1.1-.3-3.5 1.3a12.3 12.3.0 00-6.2.0C6.5 2.8 5.4 3.1 5.4 3.1a4.2 4.2.0 00-.1 3.2A4.6 4.6.0 004 9.5c0 4.6 2.7 5.7 5.5 6-.6.6-.6 1.2-.5 2V21"/></svg></a></li><li><a href=https://twitter.com target=_blank title=Twitter rel=me><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-twitter" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M22 4.01c-1 .49-1.98.689-3 .99-1.121-1.265-2.783-1.335-4.38-.737S11.977 6.323 12 8v1c-3.245.083-6.135-1.395-8-4 0 0-4.182 7.433 4 11-1.872 1.247-3.739 2.088-6 2 3.308 1.803 6.913 2.423 10.034 1.517 3.58-1.04 6.522-3.723 7.651-7.742a13.84 13.84.0 00.497-3.753C20.18 7.773 21.692 5.25 22 4.009z"/></svg></a></li></ol><ol class=menu id=main-menu><li><a href=/note/><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-home" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><polyline points="5 12 3 12 12 3 21 12 19 12"/><path d="M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7"/><path d="M9 21v-6a2 2 0 012-2h2a2 2 0 012 2v6"/></svg>
+<span>主页</span></a></li><li><a href=/note/%E5%85%B3%E4%BA%8E/><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-user" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><circle cx="12" cy="7" r="4"/><path d="M6 21v-2a4 4 0 014-4h4a4 4 0 014 4v2"/></svg>
+<span>关于</span></a></li><li><a href=/note/archives/><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><rect x="3" y="4" width="18" height="4" rx="2"/><path d="M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+<span>Archives</span></a></li><li><a href=/note/search/><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><circle cx="10" cy="10" r="7"/><line x1="21" y1="21" x2="15" y2="15"/></svg>
+<span>Search</span></a></li><li><a href=/note/links/><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-link" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><path d="M10 14a3.5 3.5.0 005 0l4-4a3.5 3.5.0 00-5-5l-.5.5"/><path d="M14 10a3.5 3.5.0 00-5 0l-4 4a3.5 3.5.0 005 5l.5-.5"/></svg>
+<span>Links</span></a></li><li class=menu-bottom-section><ol class=menu><li id=i18n-switch><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 5h7"/><path d="M9 3v2c0 4.418-2.239 8-5 8"/><path d="M5 9c-.003 2.144 2.952 3.908 6.7 4"/><path d="M12 20l4-9 4 9"/><path d="M19.1 18h-6.2"/></svg>
+<select name=language title=language onchange="window.location.href=this.selectedOptions[0].value"><option value=https://xinchentechnote.github.io/note/en/>English</option><option value=https://xinchentechnote.github.io/note/ selected>中文</option></select></li><li id=dark-mode-toggle><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><circle cx="8" cy="12" r="2"/><rect x="2" y="6" width="20" height="12" rx="6"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-right" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><circle cx="16" cy="12" r="2"/><rect x="2" y="6" width="20" height="12" rx="6"/></svg>
+<span>暗色模式</span></li></ol></li></ol></aside><aside class="sidebar right-sidebar sticky"><section class="widget archives"><div class=widget-icon><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-hash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><line x1="5" y1="9" x2="19" y2="9"/><line x1="5" y1="15" x2="19" y2="15"/><line x1="11" y1="4" x2="7" y2="20"/><line x1="17" y1="4" x2="13" y2="20"/></svg></div><h2 class="widget-title section-title">目录</h2><div class=widget--toc><nav id=TableOfContents><ol><li><a href=#-协议结构>🧩 协议结构</a></li><li><a href=#-步骤-1使用-python-构造二进制数据>🛠️ 步骤 1：使用 Python 构造二进制数据</a></li><li><a href=#-步骤-2使用-nc-模拟客户端向服务器发送数据>🚀 步骤 2：使用 <code>nc</code> 模拟客户端向服务器发送数据</a></li><li><a href=#-步骤-3使用-tcpdump-抓包>📱 步骤 3：使用 tcpdump 抓包</a></li><li><a href=#-步骤-4可选使用-tcpdump-抓包到-pcap-文件>🥪 步骤 4（可选）：使用 <code>tcpdump</code> 抓包到 <code>.pcap</code> 文件</a></li><li><a href=#-总结>✅ 总结</a></li></ol></nav></div></section></aside><main class="main full-width"><article class=main-article><header class=article-header><div class=article-details><header class=article-category><a href=/note/categories/%E7%BD%91%E7%BB%9C%E6%8A%93%E5%8C%85/>网络抓包
+</a><a href=/note/categories/%E5%8D%8F%E8%AE%AE%E8%A7%A3%E6%9E%90/>协议解析
+</a><a href=/note/categories/%E5%BC%80%E5%8F%91%E5%AE%9E%E6%88%98/>开发实战</a></header><div class=article-title-wrapper><h2 class=article-title><a href=/note/p/wireshark%E6%8F%92%E4%BB%B6%E5%BC%80%E5%8F%91%E5%AE%9E%E6%88%98-lua%E8%A7%A3%E6%9E%90%E8%87%AA%E5%AE%9A%E4%B9%89%E4%BA%8C%E8%BF%9B%E5%88%B6%E5%8D%8F%E8%AE%AE/>Wireshark插件开发实战-Lua解析自定义二进制协议</a></h2></div><footer class=article-time><div><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-time" width="56" height="56" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><path d="M11.795 21H5a2 2 0 01-2-2V7a2 2 0 012-2h12a2 2 0 012 2v4"/><circle cx="18" cy="18" r="4"/><path d="M15 3v4"/><path d="M7 3v4"/><path d="M3 11h16"/><path d="M18 16.496V18l1 1"/></svg>
+<time class=article-time--published>May 26, 2025</time></div><div><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-clock" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 15"/></svg>
+<time class=article-time--reading>阅读时长: 3 分钟</time></div></footer></div></header><section class=article-content><h1 id=wireshark插件开发实战-lua解析自定义二进制协议>Wireshark插件开发实战-Lua解析自定义二进制协议</h1><p>在调试自定义 TCP 协议时，我们常常需要构造原始的二进制数据包并通过 Wireshark 进行抓包分析。这篇文章记录使用lua开发Wireshark插件解析私有二进制协议。</p><ul><li>使用 <strong>Python 构造二进制协议数据包</strong></li><li>使用 <strong><code>nc</code>（netcat）发送数据</strong></li><li>通过 <strong>tcpdump</strong> 抓包</li><li>通过 <strong>Wireshark</strong> + lua插件解析数据包</li></ul><hr><h2 id=-协议结构>🧩 协议结构</h2><p>协议格式如下：</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt>1
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-fallback data-lang=fallback><span class=line><span class=cl>[ uint16: msgType ][ uint16: bodyLen ][ bytes[bodyLen]: JSON字符串 ]
+</span></span></code></pre></td></tr></table></div></div><p>例如：</p><ul><li>msgType = <code>1</code>（0x0001）</li><li>bodyLen = <code>9</code>（0x0009）</li><li>body = <code>{"a":123}</code></li></ul><hr><h2 id=-步骤-1使用-python-构造二进制数据>🛠️ 步骤 1：使用 Python 构造二进制数据</h2><p>使用 Python 将结构化数据写入一个二进制文件 <code>msg.bin</code>：</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt>1
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-bash data-lang=bash><span class=line><span class=cl>python3 -c <span class=s1>&#39;with open(&#34;msg.bin&#34;, &#34;wb&#34;) as f: f.write((1).to_bytes(2, &#34;big&#34;) + len(b&#34;{\&#34;a\&#34;:123}&#34;).to_bytes(2, &#34;big&#34;) + b&#34;{\&#34;a\&#34;:123}&#34;)&#39;</span>
+</span></span></code></pre></td></tr></table></div></div><p>也可以使用xxd</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt>1
+</span><span class=lnt>2
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-bash data-lang=bash><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=nb>echo</span> <span class=s1>&#39;000100097b2261223a3132337d&#39;</span> <span class=p>|</span> xxd -r -p &gt; msg.bin
+</span></span></code></pre></td></tr></table></div></div><p>文件内容即为：</p><ul><li><code>00 01</code>: msgType = 1</li><li><code>00 09</code>: bodyLen = 9</li><li><code>7b 22 61 22 3a 31 32 33 7d</code>: JSON = <code>{"a":123}</code></li></ul><p>可以使用 <code>xxd</code> 验证内容：</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt>1
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-bash data-lang=bash><span class=line><span class=cl>xxd msg.bin
+</span></span></code></pre></td></tr></table></div></div><p><img src=/note/images/mgs-bin.png loading=lazy alt=消息包></p><hr><h2 id=-步骤-2使用-nc-模拟客户端向服务器发送数据>🚀 步骤 2：使用 <code>nc</code> 模拟客户端向服务器发送数据</h2><p>通过nc模拟tcp服务器监听端口，例如 <code>12345</code>：</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt>1
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-bash data-lang=bash><span class=line><span class=cl>nc -l -p <span class=m>12345</span>
+</span></span></code></pre></td></tr></table></div></div><p>通过nc模拟tcp客户端，往服务端发送消息：</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt>1
+</span><span class=lnt>2
+</span><span class=lnt>3
+</span><span class=lnt>4
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-bash data-lang=bash><span class=line><span class=cl><span class=c1># 发送数据到监听端口 12345</span>
+</span></span><span class=line><span class=cl>nc 127.0.0.1 <span class=m>12345</span> &lt; msg.bin
+</span></span><span class=line><span class=cl><span class=c1># 也可以通过 xxd生成二进制数据直接发送</span>
+</span></span><span class=line><span class=cl><span class=nb>echo</span> <span class=s1>&#39;0001 0009 7b2261223a3132337d&#39;</span> <span class=p>|</span> xxd -r -p <span class=p>|</span> nc 127.0.0.1 <span class=m>12345</span>
+</span></span></code></pre></td></tr></table></div></div><hr><h2 id=-步骤-3使用-tcpdump-抓包>📱 步骤 3：使用 tcpdump 抓包</h2><p>sudo tcpdump -i lo port 12345 -w capture.pcap</p><ol><li>启动 Wireshark 打开</li></ol><p><img src=/note/images/without-lua-plugin.png loading=lazy alt=加载插件前></p><ol start=2><li>基于lua开发wireshark插件</li></ol><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span><span class=lnt>11
+</span><span class=lnt>12
+</span><span class=lnt>13
+</span><span class=lnt>14
+</span><span class=lnt>15
+</span><span class=lnt>16
+</span><span class=lnt>17
+</span><span class=lnt>18
+</span><span class=lnt>19
+</span><span class=lnt>20
+</span><span class=lnt>21
+</span><span class=lnt>22
+</span><span class=lnt>23
+</span><span class=lnt>24
+</span><span class=lnt>25
+</span><span class=lnt>26
+</span><span class=lnt>27
+</span><span class=lnt>28
+</span><span class=lnt>29
+</span><span class=lnt>30
+</span><span class=lnt>31
+</span><span class=lnt>32
+</span><span class=lnt>33
+</span><span class=lnt>34
+</span><span class=lnt>35
+</span><span class=lnt>36
+</span><span class=lnt>37
+</span><span class=lnt>38
+</span><span class=lnt>39
+</span><span class=lnt>40
+</span><span class=lnt>41
+</span><span class=lnt>42
+</span><span class=lnt>43
+</span><span class=lnt>44
+</span><span class=lnt>45
+</span><span class=lnt>46
+</span><span class=lnt>47
+</span><span class=lnt>48
+</span><span class=lnt>49
+</span><span class=lnt>50
+</span><span class=lnt>51
+</span><span class=lnt>52
+</span><span class=lnt>53
+</span><span class=lnt>54
+</span><span class=lnt>55
+</span><span class=lnt>56
+</span><span class=lnt>57
+</span><span class=lnt>58
+</span><span class=lnt>59
+</span><span class=lnt>60
+</span><span class=lnt>61
+</span><span class=lnt>62
+</span><span class=lnt>63
+</span><span class=lnt>64
+</span><span class=lnt>65
+</span><span class=lnt>66
+</span><span class=lnt>67
+</span><span class=lnt>68
+</span><span class=lnt>69
+</span><span class=lnt>70
+</span><span class=lnt>71
+</span><span class=lnt>72
+</span><span class=lnt>73
+</span><span class=lnt>74
+</span><span class=lnt>75
+</span><span class=lnt>76
+</span><span class=lnt>77
+</span><span class=lnt>78
+</span><span class=lnt>79
+</span><span class=lnt>80
+</span><span class=lnt>81
+</span><span class=lnt>82
+</span><span class=lnt>83
+</span><span class=lnt>84
+</span><span class=lnt>85
+</span><span class=lnt>86
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-lua data-lang=lua><span class=line><span class=cl><span class=cm>--[[ 
+</span></span></span><span class=line><span class=cl><span class=cm>   sample.lua © 2025 xinchen@af83f787e8911dea9b3bf677746ebac9
+</span></span></span><span class=line><span class=cl><span class=cm>
+</span></span></span><span class=line><span class=cl><span class=cm>   A simple Wireshark Lua dissector for a custom protocol whose payload is:
+</span></span></span><span class=line><span class=cl><span class=cm>     [ uint16 msgType ][ uint16 bodyLen ][ bytes[bodyLen] containing a JSON string ]
+</span></span></span><span class=line><span class=cl><span class=cm>
+</span></span></span><span class=line><span class=cl><span class=cm>   To use:
+</span></span></span><span class=line><span class=cl><span class=cm>   1. Save this file as “sample.lua” (or any name ending in .lua).
+</span></span></span><span class=line><span class=cl><span class=cm>   2. Place it into your Wireshark plugins directory (e.g., on Windows: 
+</span></span></span><span class=line><span class=cl><span class=cm>      C:\Program Files\Wireshark\plugins\&lt;version&gt;\ or under ~/.config/wireshark/plugins/ for Linux/Mac).
+</span></span></span><span class=line><span class=cl><span class=cm>   3. Restart Wireshark.
+</span></span></span><span class=line><span class=cl><span class=cm>   4. If your protocol runs over TCP on port 12345, it will now decode automatically.
+</span></span></span><span class=line><span class=cl><span class=cm>      (Adjust the port number in the last lines below to match your actual port.)
+</span></span></span><span class=line><span class=cl><span class=cm>--]]</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=c1>-- 1. Define the protocol</span>
+</span></span><span class=line><span class=cl><span class=kd>local</span> <span class=n>sample</span> <span class=o>=</span> <span class=n>Proto</span><span class=p>(</span><span class=s2>&#34;sample&#34;</span><span class=p>,</span> <span class=s2>&#34;My JSON‐Over‐Binary Protocol&#34;</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=c1>-- 2. Define the fields we want to extract:</span>
+</span></span><span class=line><span class=cl><span class=c1>--    - msgType:   uint16</span>
+</span></span><span class=line><span class=cl><span class=c1>--    - bodyLen:   uint16</span>
+</span></span><span class=line><span class=cl><span class=c1>--    - jsonStr:   the JSON text (bytes interpreted as string)</span>
+</span></span><span class=line><span class=cl><span class=kd>local</span> <span class=n>f_msgType</span> <span class=o>=</span> <span class=n>ProtoField.uint16</span><span class=p>(</span><span class=s2>&#34;sample.msgType&#34;</span><span class=p>,</span> <span class=s2>&#34;Message Type&#34;</span><span class=p>,</span> <span class=n>base.DEC</span><span class=p>)</span>
+</span></span><span class=line><span class=cl><span class=kd>local</span> <span class=n>f_bodyLen</span> <span class=o>=</span> <span class=n>ProtoField.uint16</span><span class=p>(</span><span class=s2>&#34;sample.bodyLen&#34;</span><span class=p>,</span> <span class=s2>&#34;Body Length&#34;</span><span class=p>,</span> <span class=n>base.DEC</span><span class=p>)</span>
+</span></span><span class=line><span class=cl><span class=kd>local</span> <span class=n>f_jsonStr</span> <span class=o>=</span> <span class=n>ProtoField.string</span><span class=p>(</span><span class=s2>&#34;sample.json&#34;</span><span class=p>,</span> <span class=s2>&#34;JSON Payload&#34;</span><span class=p>,</span> <span class=n>base.ASCII</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=n>sample.fields</span> <span class=o>=</span> <span class=p>{</span> <span class=n>f_msgType</span><span class=p>,</span> <span class=n>f_bodyLen</span><span class=p>,</span> <span class=n>f_jsonStr</span> <span class=p>}</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=c1>-- 3. The dissector function</span>
+</span></span><span class=line><span class=cl><span class=kr>function</span> <span class=nc>sample</span><span class=p>.</span><span class=nf>dissector</span><span class=p>(</span><span class=n>buffer</span><span class=p>,</span> <span class=n>pinfo</span><span class=p>,</span> <span class=n>tree</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>    <span class=c1>-- buffer:            the entire packet’s raw bytes</span>
+</span></span><span class=line><span class=cl>    <span class=c1>-- pinfo:             packet metadata (e.g. columns, protocol)</span>
+</span></span><span class=line><span class=cl>    <span class=c1>-- tree:              the protocol tree to which we add our parsed fields</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>    <span class=c1>-- First, ensure we have at least 4 bytes for msgType + bodyLen</span>
+</span></span><span class=line><span class=cl>    <span class=kr>if</span> <span class=n>buffer</span><span class=p>:</span><span class=n>len</span><span class=p>()</span> <span class=o>&lt;</span> <span class=mi>4</span> <span class=kr>then</span>
+</span></span><span class=line><span class=cl>        <span class=kr>return</span> <span class=mi>0</span>
+</span></span><span class=line><span class=cl>    <span class=kr>end</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>    <span class=c1>-- Tell Wireshark which protocol column to display</span>
+</span></span><span class=line><span class=cl>    <span class=n>pinfo.cols</span><span class=p>.</span><span class=n>protocol</span> <span class=o>=</span> <span class=n>sample.name</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>    <span class=c1>-- Add a subtree “My JSON‐Over‐Binary Protocol”</span>
+</span></span><span class=line><span class=cl>    <span class=kd>local</span> <span class=n>subtree</span> <span class=o>=</span> <span class=n>tree</span><span class=p>:</span><span class=n>add</span><span class=p>(</span><span class=n>sample</span><span class=p>,</span> <span class=n>buffer</span><span class=p>(),</span> <span class=s2>&#34;My JSON‐Over‐Binary Protocol Data&#34;</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>    <span class=kd>local</span> <span class=n>offset</span> <span class=o>=</span> <span class=mi>0</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>    <span class=c1>-- 3.1 Parse msgType (2 bytes)</span>
+</span></span><span class=line><span class=cl>    <span class=kd>local</span> <span class=n>msgType_field</span> <span class=o>=</span> <span class=n>buffer</span><span class=p>(</span><span class=n>offset</span><span class=p>,</span> <span class=mi>2</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>    <span class=kd>local</span> <span class=n>msgType_val</span> <span class=o>=</span> <span class=n>msgType_field</span><span class=p>:</span><span class=n>uint</span><span class=p>()</span>
+</span></span><span class=line><span class=cl>    <span class=n>subtree</span><span class=p>:</span><span class=n>add</span><span class=p>(</span><span class=n>f_msgType</span><span class=p>,</span> <span class=n>msgType_field</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>    <span class=n>offset</span> <span class=o>=</span> <span class=n>offset</span> <span class=o>+</span> <span class=mi>2</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>    <span class=c1>-- 3.2 Parse bodyLen (2 bytes)</span>
+</span></span><span class=line><span class=cl>    <span class=kd>local</span> <span class=n>bodyLen_field</span> <span class=o>=</span> <span class=n>buffer</span><span class=p>(</span><span class=n>offset</span><span class=p>,</span> <span class=mi>2</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>    <span class=kd>local</span> <span class=n>bodyLen_val</span> <span class=o>=</span> <span class=n>bodyLen_field</span><span class=p>:</span><span class=n>uint</span><span class=p>()</span>
+</span></span><span class=line><span class=cl>    <span class=n>subtree</span><span class=p>:</span><span class=n>add</span><span class=p>(</span><span class=n>f_bodyLen</span><span class=p>,</span> <span class=n>bodyLen_field</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>    <span class=n>offset</span> <span class=o>=</span> <span class=n>offset</span> <span class=o>+</span> <span class=mi>2</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>    <span class=c1>-- 3.3 Check if full JSON payload is available</span>
+</span></span><span class=line><span class=cl>    <span class=kr>if</span> <span class=n>buffer</span><span class=p>:</span><span class=n>len</span><span class=p>()</span> <span class=o>&lt;</span> <span class=n>offset</span> <span class=o>+</span> <span class=n>bodyLen_val</span> <span class=kr>then</span>
+</span></span><span class=line><span class=cl>        <span class=c1>-- If not enough bytes, mark it as malformed/truncated</span>
+</span></span><span class=line><span class=cl>        <span class=n>subtree</span><span class=p>:</span><span class=n>add_expert_info</span><span class=p>(</span><span class=n>PI_MALFORMED</span><span class=p>,</span> <span class=n>PI_ERROR</span><span class=p>,</span> <span class=s2>&#34;Packet too short for advertised bodyLen&#34;</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>        <span class=kr>return</span>
+</span></span><span class=line><span class=cl>    <span class=kr>end</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>    <span class=c1>-- 3.4 Extract the JSON string bytes, interpret as ASCII/UTF-8</span>
+</span></span><span class=line><span class=cl>    <span class=kd>local</span> <span class=n>json_field</span> <span class=o>=</span> <span class=n>buffer</span><span class=p>(</span><span class=n>offset</span><span class=p>,</span> <span class=n>bodyLen_val</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>    <span class=c1>-- We use :string() so that Wireshark will display it as text</span>
+</span></span><span class=line><span class=cl>    <span class=n>subtree</span><span class=p>:</span><span class=n>add</span><span class=p>(</span><span class=n>f_jsonStr</span><span class=p>,</span> <span class=n>json_field</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>    <span class=n>offset</span> <span class=o>=</span> <span class=n>offset</span> <span class=o>+</span> <span class=n>bodyLen_val</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>    <span class=c1>-- (Optional) If you want to pretty-print or validate JSON,</span>
+</span></span><span class=line><span class=cl>    <span class=c1>-- you could attempt to parse it here or use a heuristic.</span>
+</span></span><span class=line><span class=cl>    <span class=c1>-- But for most purposes, displaying the raw string is enough.</span>
+</span></span><span class=line><span class=cl><span class=kr>end</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=c1>-- 4. Register the dissector on a specific TCP port (e.g. 12345).</span>
+</span></span><span class=line><span class=cl><span class=c1>--    Change “12345” to whatever port your protocol actually uses, or</span>
+</span></span><span class=line><span class=cl><span class=c1>--    alternatively hook into a heuristic/UDP/etc. as desired.</span>
+</span></span><span class=line><span class=cl><span class=kd>local</span> <span class=n>tcp_port</span> <span class=o>=</span> <span class=n>DissectorTable.get</span><span class=p>(</span><span class=s2>&#34;tcp.port&#34;</span><span class=p>)</span>
+</span></span><span class=line><span class=cl><span class=n>tcp_port</span><span class=p>:</span><span class=n>add</span><span class=p>(</span><span class=mi>12345</span><span class=p>,</span> <span class=n>sample</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=c1>-- If your protocol is over UDP, swap the last two lines with:</span>
+</span></span><span class=line><span class=cl><span class=c1>-- local udp_port = DissectorTable.get(&#34;udp.port&#34;)</span>
+</span></span><span class=line><span class=cl><span class=c1>-- udp_port:add(12345, sample)</span>
+</span></span></code></pre></td></tr></table></div></div><p>保存为 <code>sample.lua</code> 并放入 Wireshark 插件目录中（如 <code>~/.config/wireshark/plugins/</code>，或window中<code> C:\Program Files\Wireshark\plugins\&lt;version>\</code>），重新打开 Wireshark 即可。</p><p><img src=/note/images/with-lua-plugin.png loading=lazy alt=加载插件后></p><h2 id=-步骤-4可选使用-tcpdump-抓包到-pcap-文件>🥪 步骤 4（可选）：使用 <code>tcpdump</code> 抓包到 <code>.pcap</code> 文件</h2><p>如果你希望在终端中进行抓包或生成 <code>.pcap</code> 文件用于后续分析，可以在 <strong>Windows 主机上安装 WinDump（tcpdump 的 Windows 版本）</strong>：</p><ol><li><p>安装 <a class=link href=https://nmap.org/npcap/ target=_blank rel=noopener>Npcap</a></p></li><li><p>安装 <a class=link href=https://www.winpcap.org/windump/ target=_blank rel=noopener>WinDump</a></p></li><li><p>查看接口列表：</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt>1
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-bash data-lang=bash><span class=line><span class=cl>windump -D
+</span></span></code></pre></td></tr></table></div></div></li><li><p>选择正确接口编号，开始抓包：</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt>1
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-bash data-lang=bash><span class=line><span class=cl>windump -i <span class=m>3</span> tcp port <span class=m>12345</span> -w test.pcap
+</span></span></code></pre></td></tr></table></div></div></li><li><p>使用 Wireshark 打开 <code>test.pcap</code> 文件进行分析。</p></li></ol><hr><h2 id=-总结>✅ 总结</h2><p>通过以上方式，我们完成了以下目标：</p><ul><li>✅ 构造自定义协议的二进制数据</li><li>✅ 使用 <code>nc</code> 模拟客户端及服务端发送数据</li><li>✅ 使用 Wireshark 和 tcpdump 抓包</li><li>✅ 编写 Lua 脚本进行协议解析</li></ul><p>这种方法适合调试任何基于 TCP/UDP 的自定义协议，非常适合开发和测试场景。</p><hr><p>如果你也在调试自己的私有协议，不妨用这个流程走一遍！希望对你有帮助 😎</p></section><footer class=article-footer><section class=article-tags><a href=/note/tags/lua/>Lua</a>
+<a href=/note/tags/wireshark/>Wireshark</a>
+<a href=/note/tags/%E6%8A%93%E5%8C%85%E5%88%86%E6%9E%90/>抓包分析</a>
+<a href=/note/tags/%E7%BD%91%E7%BB%9C%E8%B0%83%E8%AF%95/>网络调试</a>
+<a href=/note/tags/%E6%8F%92%E4%BB%B6%E5%BC%80%E5%8F%91/>插件开发</a>
+<a href=/note/tags/tcpdump/>Tcpdump</a></section><section class=article-copyright><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-copyright" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><circle cx="12" cy="12" r="9"/><path d="M14.5 9a3.5 4 0 100 6"/></svg>
+<span>Licensed under CC BY-NC-SA 4.0</span></section></footer></article><div class=disqus-container><div id=disqus_thread></div><script>window.disqus_config=function(){},function(){if(["localhost","127.0.0.1"].indexOf(window.location.hostname)!=-1){document.getElementById("disqus_thread").innerHTML="Disqus comments not available by default when the website is previewed locally.";return}var t=document,e=t.createElement("script");e.async=!0,e.src="//hugo-theme-stack.disqus.com/embed.js",e.setAttribute("data-timestamp",+new Date),(t.head||t.body).appendChild(e)}()</script><noscript>Please enable JavaScript to view the <a href=https://disqus.com/?ref_noscript>comments powered by Disqus.</a></noscript><a href=https://disqus.com class=dsq-brlink>comments powered by <span class=logo-disqus>Disqus</span></a></div><style>.disqus-container{background-color:var(--card-background);border-radius:var(--card-border-radius);box-shadow:var(--shadow-l1);padding:var(--card-padding)}</style><script>window.addEventListener("onColorSchemeChange",e=>{typeof DISQUS=="object"&&DISQUS.reset({reload:!0})})</script><footer class=site-footer><section class=copyright>&copy;
+2025 xinchen@af83f787e8911dea9b3bf677746ebac9</section><section class=powerby>使用 <a href=https://gohugo.io/ target=_blank rel=noopener>Hugo</a> 构建<br>主题 <b><a href=https://github.com/CaiJimmy/hugo-theme-stack target=_blank rel=noopener data-version=3.30.0>Stack</a></b> 由 <a href=https://jimmycai.com target=_blank rel=noopener>Jimmy</a> 设计</section></footer><div class=pswp tabindex=-1 role=dialog aria-hidden=true><div class=pswp__bg></div><div class=pswp__scroll-wrap><div class=pswp__container><div class=pswp__item></div><div class=pswp__item></div><div class=pswp__item></div></div><div class="pswp__ui pswp__ui--hidden"><div class=pswp__top-bar><div class=pswp__counter></div><button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+<button class="pswp__button pswp__button--share" title=Share></button>
+<button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+<button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button><div class=pswp__preloader><div class=pswp__preloader__icn><div class=pswp__preloader__cut><div class=pswp__preloader__donut></div></div></div></div></div><div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap"><div class=pswp__share-tooltip></div></div><button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+</button>
+<button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)"></button><div class=pswp__caption><div class=pswp__caption__center></div></div></div></div></div><script src=https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo=" crossorigin=anonymous defer></script><script src=https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU=" crossorigin=anonymous defer></script><link rel=stylesheet href=https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css crossorigin=anonymous><link rel=stylesheet href=https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css crossorigin=anonymous></main></div><script src=https://cdn.jsdelivr.net/npm/node-vibrant@3.1.6/dist/vibrant.min.js integrity="sha256-awcR2jno4kI5X0zL8ex0vi2z+KMkF24hUW8WePSA9HM=" crossorigin=anonymous></script><script type=text/javascript src=/note/ts/main.1e9a3bafd846ced4c345d084b355fb8c7bae75701c338f8a1f8a82c780137826.js defer></script><script>(function(){const e=document.createElement("link");e.href="https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap",e.type="text/css",e.rel="stylesheet",document.head.appendChild(e)})()</script></body></html>

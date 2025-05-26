@@ -1,0 +1,337 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>协议解析 on 歆晨技术笔记</title><link>https://xinchentechnote.github.io/note/categories/%E5%8D%8F%E8%AE%AE%E8%A7%A3%E6%9E%90/</link><description>Recent content in 协议解析 on 歆晨技术笔记</description><generator>Hugo -- gohugo.io</generator><language>zh-cn</language><copyright>xinchen@af83f787e8911dea9b3bf677746ebac9</copyright><lastBuildDate>Mon, 26 May 2025 11:48:25 +0800</lastBuildDate><atom:link href="https://xinchentechnote.github.io/note/categories/%E5%8D%8F%E8%AE%AE%E8%A7%A3%E6%9E%90/index.xml" rel="self" type="application/rss+xml"/><item><title>Wireshark插件开发实战-Lua解析自定义二进制协议</title><link>https://xinchentechnote.github.io/note/p/wireshark%E6%8F%92%E4%BB%B6%E5%BC%80%E5%8F%91%E5%AE%9E%E6%88%98-lua%E8%A7%A3%E6%9E%90%E8%87%AA%E5%AE%9A%E4%B9%89%E4%BA%8C%E8%BF%9B%E5%88%B6%E5%8D%8F%E8%AE%AE/</link><pubDate>Mon, 26 May 2025 11:48:25 +0800</pubDate><guid>https://xinchentechnote.github.io/note/p/wireshark%E6%8F%92%E4%BB%B6%E5%BC%80%E5%8F%91%E5%AE%9E%E6%88%98-lua%E8%A7%A3%E6%9E%90%E8%87%AA%E5%AE%9A%E4%B9%89%E4%BA%8C%E8%BF%9B%E5%88%B6%E5%8D%8F%E8%AE%AE/</guid><description>&lt;h1 id="wireshark插件开发实战-lua解析自定义二进制协议">Wireshark插件开发实战-Lua解析自定义二进制协议
+&lt;/h1>&lt;p>在调试自定义 TCP 协议时，我们常常需要构造原始的二进制数据包并通过 Wireshark 进行抓包分析。这篇文章记录使用lua开发Wireshark插件解析私有二进制协议。&lt;/p>
+&lt;ul>
+&lt;li>使用 &lt;strong>Python 构造二进制协议数据包&lt;/strong>&lt;/li>
+&lt;li>使用 &lt;strong>&lt;code>nc&lt;/code>（netcat）发送数据&lt;/strong>&lt;/li>
+&lt;li>通过 &lt;strong>tcpdump&lt;/strong> 抓包&lt;/li>
+&lt;li>通过 &lt;strong>Wireshark&lt;/strong> + lua插件解析数据包&lt;/li>
+&lt;/ul>
+&lt;hr>
+&lt;h2 id="-协议结构">🧩 协议结构
+&lt;/h2>&lt;p>协议格式如下：&lt;/p>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt">1
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-fallback" data-lang="fallback">&lt;span class="line">&lt;span class="cl">[ uint16: msgType ][ uint16: bodyLen ][ bytes[bodyLen]: JSON字符串 ]
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;p>例如：&lt;/p>
+&lt;ul>
+&lt;li>msgType = &lt;code>1&lt;/code>（0x0001）&lt;/li>
+&lt;li>bodyLen = &lt;code>9&lt;/code>（0x0009）&lt;/li>
+&lt;li>body = &lt;code>{&amp;quot;a&amp;quot;:123}&lt;/code>&lt;/li>
+&lt;/ul>
+&lt;hr>
+&lt;h2 id="-步骤-1使用-python-构造二进制数据">🛠️ 步骤 1：使用 Python 构造二进制数据
+&lt;/h2>&lt;p>使用 Python 将结构化数据写入一个二进制文件 &lt;code>msg.bin&lt;/code>：&lt;/p>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt">1
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-bash" data-lang="bash">&lt;span class="line">&lt;span class="cl">python3 -c &lt;span class="s1">&amp;#39;with open(&amp;#34;msg.bin&amp;#34;, &amp;#34;wb&amp;#34;) as f: f.write((1).to_bytes(2, &amp;#34;big&amp;#34;) + len(b&amp;#34;{\&amp;#34;a\&amp;#34;:123}&amp;#34;).to_bytes(2, &amp;#34;big&amp;#34;) + b&amp;#34;{\&amp;#34;a\&amp;#34;:123}&amp;#34;)&amp;#39;&lt;/span>
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;p>也可以使用xxd&lt;/p>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt">1
+&lt;/span>&lt;span class="lnt">2
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-bash" data-lang="bash">&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="nb">echo&lt;/span> &lt;span class="s1">&amp;#39;000100097b2261223a3132337d&amp;#39;&lt;/span> &lt;span class="p">|&lt;/span> xxd -r -p &amp;gt; msg.bin
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;p>文件内容即为：&lt;/p>
+&lt;ul>
+&lt;li>&lt;code>00 01&lt;/code>: msgType = 1&lt;/li>
+&lt;li>&lt;code>00 09&lt;/code>: bodyLen = 9&lt;/li>
+&lt;li>&lt;code>7b 22 61 22 3a 31 32 33 7d&lt;/code>: JSON = &lt;code>{&amp;quot;a&amp;quot;:123}&lt;/code>&lt;/li>
+&lt;/ul>
+&lt;p>可以使用 &lt;code>xxd&lt;/code> 验证内容：&lt;/p>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt">1
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-bash" data-lang="bash">&lt;span class="line">&lt;span class="cl">xxd msg.bin
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;p>&lt;img src="https://xinchentechnote.github.io/note/note/images/mgs-bin.png"
+loading="lazy"
+alt="消息包"
+>&lt;/p>
+&lt;hr>
+&lt;h2 id="-步骤-2使用-nc-模拟客户端向服务器发送数据">🚀 步骤 2：使用 &lt;code>nc&lt;/code> 模拟客户端向服务器发送数据
+&lt;/h2>&lt;p>通过nc模拟tcp服务器监听端口，例如 &lt;code>12345&lt;/code>：&lt;/p>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt">1
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-bash" data-lang="bash">&lt;span class="line">&lt;span class="cl">nc -l -p &lt;span class="m">12345&lt;/span>
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;p>通过nc模拟tcp客户端，往服务端发送消息：&lt;/p>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt">1
+&lt;/span>&lt;span class="lnt">2
+&lt;/span>&lt;span class="lnt">3
+&lt;/span>&lt;span class="lnt">4
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-bash" data-lang="bash">&lt;span class="line">&lt;span class="cl">&lt;span class="c1"># 发送数据到监听端口 12345&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">nc 127.0.0.1 &lt;span class="m">12345&lt;/span> &amp;lt; msg.bin
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="c1"># 也可以通过 xxd生成二进制数据直接发送&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="nb">echo&lt;/span> &lt;span class="s1">&amp;#39;0001 0009 7b2261223a3132337d&amp;#39;&lt;/span> &lt;span class="p">|&lt;/span> xxd -r -p &lt;span class="p">|&lt;/span> nc 127.0.0.1 &lt;span class="m">12345&lt;/span>
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;hr>
+&lt;h2 id="-步骤-3使用-tcpdump-抓包">📱 步骤 3：使用 tcpdump 抓包
+&lt;/h2>&lt;p>sudo tcpdump -i lo port 12345 -w capture.pcap&lt;/p>
+&lt;ol>
+&lt;li>启动 Wireshark 打开&lt;/li>
+&lt;/ol>
+&lt;p>&lt;img src="https://xinchentechnote.github.io/note/note/images/without-lua-plugin.png"
+loading="lazy"
+alt="加载插件前"
+>&lt;/p>
+&lt;ol start="2">
+&lt;li>基于lua开发wireshark插件&lt;/li>
+&lt;/ol>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt"> 1
+&lt;/span>&lt;span class="lnt"> 2
+&lt;/span>&lt;span class="lnt"> 3
+&lt;/span>&lt;span class="lnt"> 4
+&lt;/span>&lt;span class="lnt"> 5
+&lt;/span>&lt;span class="lnt"> 6
+&lt;/span>&lt;span class="lnt"> 7
+&lt;/span>&lt;span class="lnt"> 8
+&lt;/span>&lt;span class="lnt"> 9
+&lt;/span>&lt;span class="lnt">10
+&lt;/span>&lt;span class="lnt">11
+&lt;/span>&lt;span class="lnt">12
+&lt;/span>&lt;span class="lnt">13
+&lt;/span>&lt;span class="lnt">14
+&lt;/span>&lt;span class="lnt">15
+&lt;/span>&lt;span class="lnt">16
+&lt;/span>&lt;span class="lnt">17
+&lt;/span>&lt;span class="lnt">18
+&lt;/span>&lt;span class="lnt">19
+&lt;/span>&lt;span class="lnt">20
+&lt;/span>&lt;span class="lnt">21
+&lt;/span>&lt;span class="lnt">22
+&lt;/span>&lt;span class="lnt">23
+&lt;/span>&lt;span class="lnt">24
+&lt;/span>&lt;span class="lnt">25
+&lt;/span>&lt;span class="lnt">26
+&lt;/span>&lt;span class="lnt">27
+&lt;/span>&lt;span class="lnt">28
+&lt;/span>&lt;span class="lnt">29
+&lt;/span>&lt;span class="lnt">30
+&lt;/span>&lt;span class="lnt">31
+&lt;/span>&lt;span class="lnt">32
+&lt;/span>&lt;span class="lnt">33
+&lt;/span>&lt;span class="lnt">34
+&lt;/span>&lt;span class="lnt">35
+&lt;/span>&lt;span class="lnt">36
+&lt;/span>&lt;span class="lnt">37
+&lt;/span>&lt;span class="lnt">38
+&lt;/span>&lt;span class="lnt">39
+&lt;/span>&lt;span class="lnt">40
+&lt;/span>&lt;span class="lnt">41
+&lt;/span>&lt;span class="lnt">42
+&lt;/span>&lt;span class="lnt">43
+&lt;/span>&lt;span class="lnt">44
+&lt;/span>&lt;span class="lnt">45
+&lt;/span>&lt;span class="lnt">46
+&lt;/span>&lt;span class="lnt">47
+&lt;/span>&lt;span class="lnt">48
+&lt;/span>&lt;span class="lnt">49
+&lt;/span>&lt;span class="lnt">50
+&lt;/span>&lt;span class="lnt">51
+&lt;/span>&lt;span class="lnt">52
+&lt;/span>&lt;span class="lnt">53
+&lt;/span>&lt;span class="lnt">54
+&lt;/span>&lt;span class="lnt">55
+&lt;/span>&lt;span class="lnt">56
+&lt;/span>&lt;span class="lnt">57
+&lt;/span>&lt;span class="lnt">58
+&lt;/span>&lt;span class="lnt">59
+&lt;/span>&lt;span class="lnt">60
+&lt;/span>&lt;span class="lnt">61
+&lt;/span>&lt;span class="lnt">62
+&lt;/span>&lt;span class="lnt">63
+&lt;/span>&lt;span class="lnt">64
+&lt;/span>&lt;span class="lnt">65
+&lt;/span>&lt;span class="lnt">66
+&lt;/span>&lt;span class="lnt">67
+&lt;/span>&lt;span class="lnt">68
+&lt;/span>&lt;span class="lnt">69
+&lt;/span>&lt;span class="lnt">70
+&lt;/span>&lt;span class="lnt">71
+&lt;/span>&lt;span class="lnt">72
+&lt;/span>&lt;span class="lnt">73
+&lt;/span>&lt;span class="lnt">74
+&lt;/span>&lt;span class="lnt">75
+&lt;/span>&lt;span class="lnt">76
+&lt;/span>&lt;span class="lnt">77
+&lt;/span>&lt;span class="lnt">78
+&lt;/span>&lt;span class="lnt">79
+&lt;/span>&lt;span class="lnt">80
+&lt;/span>&lt;span class="lnt">81
+&lt;/span>&lt;span class="lnt">82
+&lt;/span>&lt;span class="lnt">83
+&lt;/span>&lt;span class="lnt">84
+&lt;/span>&lt;span class="lnt">85
+&lt;/span>&lt;span class="lnt">86
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-lua" data-lang="lua">&lt;span class="line">&lt;span class="cl">&lt;span class="cm">--[[
+&lt;/span>&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="cm"> sample.lua © 2025 xinchen@af83f787e8911dea9b3bf677746ebac9
+&lt;/span>&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="cm">
+&lt;/span>&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="cm"> A simple Wireshark Lua dissector for a custom protocol whose payload is:
+&lt;/span>&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="cm"> [ uint16 msgType ][ uint16 bodyLen ][ bytes[bodyLen] containing a JSON string ]
+&lt;/span>&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="cm">
+&lt;/span>&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="cm"> To use:
+&lt;/span>&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="cm"> 1. Save this file as “sample.lua” (or any name ending in .lua).
+&lt;/span>&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="cm"> 2. Place it into your Wireshark plugins directory (e.g., on Windows:
+&lt;/span>&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="cm"> C:\Program Files\Wireshark\plugins\&amp;lt;version&amp;gt;\ or under ~/.config/wireshark/plugins/ for Linux/Mac).
+&lt;/span>&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="cm"> 3. Restart Wireshark.
+&lt;/span>&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="cm"> 4. If your protocol runs over TCP on port 12345, it will now decode automatically.
+&lt;/span>&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="cm"> (Adjust the port number in the last lines below to match your actual port.)
+&lt;/span>&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="cm">--]]&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="c1">-- 1. Define the protocol&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="kd">local&lt;/span> &lt;span class="n">sample&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">Proto&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="s2">&amp;#34;sample&amp;#34;&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="s2">&amp;#34;My JSON‐Over‐Binary Protocol&amp;#34;&lt;/span>&lt;span class="p">)&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="c1">-- 2. Define the fields we want to extract:&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="c1">-- - msgType: uint16&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="c1">-- - bodyLen: uint16&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="c1">-- - jsonStr: the JSON text (bytes interpreted as string)&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="kd">local&lt;/span> &lt;span class="n">f_msgType&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">ProtoField.uint16&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="s2">&amp;#34;sample.msgType&amp;#34;&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="s2">&amp;#34;Message Type&amp;#34;&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">base.DEC&lt;/span>&lt;span class="p">)&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="kd">local&lt;/span> &lt;span class="n">f_bodyLen&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">ProtoField.uint16&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="s2">&amp;#34;sample.bodyLen&amp;#34;&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="s2">&amp;#34;Body Length&amp;#34;&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">base.DEC&lt;/span>&lt;span class="p">)&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="kd">local&lt;/span> &lt;span class="n">f_jsonStr&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">ProtoField.string&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="s2">&amp;#34;sample.json&amp;#34;&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="s2">&amp;#34;JSON Payload&amp;#34;&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">base.ASCII&lt;/span>&lt;span class="p">)&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="n">sample.fields&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="p">{&lt;/span> &lt;span class="n">f_msgType&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">f_bodyLen&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">f_jsonStr&lt;/span> &lt;span class="p">}&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="c1">-- 3. The dissector function&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="kr">function&lt;/span> &lt;span class="nc">sample&lt;/span>&lt;span class="p">.&lt;/span>&lt;span class="nf">dissector&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">buffer&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">pinfo&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">tree&lt;/span>&lt;span class="p">)&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="c1">-- buffer: the entire packet’s raw bytes&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="c1">-- pinfo: packet metadata (e.g. columns, protocol)&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="c1">-- tree: the protocol tree to which we add our parsed fields&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="c1">-- First, ensure we have at least 4 bytes for msgType + bodyLen&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="kr">if&lt;/span> &lt;span class="n">buffer&lt;/span>&lt;span class="p">:&lt;/span>&lt;span class="n">len&lt;/span>&lt;span class="p">()&lt;/span> &lt;span class="o">&amp;lt;&lt;/span> &lt;span class="mi">4&lt;/span> &lt;span class="kr">then&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="kr">return&lt;/span> &lt;span class="mi">0&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="kr">end&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="c1">-- Tell Wireshark which protocol column to display&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">pinfo.cols&lt;/span>&lt;span class="p">.&lt;/span>&lt;span class="n">protocol&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">sample.name&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="c1">-- Add a subtree “My JSON‐Over‐Binary Protocol”&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="kd">local&lt;/span> &lt;span class="n">subtree&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">tree&lt;/span>&lt;span class="p">:&lt;/span>&lt;span class="n">add&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">sample&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">buffer&lt;/span>&lt;span class="p">(),&lt;/span> &lt;span class="s2">&amp;#34;My JSON‐Over‐Binary Protocol Data&amp;#34;&lt;/span>&lt;span class="p">)&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="kd">local&lt;/span> &lt;span class="n">offset&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="mi">0&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="c1">-- 3.1 Parse msgType (2 bytes)&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="kd">local&lt;/span> &lt;span class="n">msgType_field&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">buffer&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">offset&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="mi">2&lt;/span>&lt;span class="p">)&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="kd">local&lt;/span> &lt;span class="n">msgType_val&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">msgType_field&lt;/span>&lt;span class="p">:&lt;/span>&lt;span class="n">uint&lt;/span>&lt;span class="p">()&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">subtree&lt;/span>&lt;span class="p">:&lt;/span>&lt;span class="n">add&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">f_msgType&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">msgType_field&lt;/span>&lt;span class="p">)&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">offset&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">offset&lt;/span> &lt;span class="o">+&lt;/span> &lt;span class="mi">2&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="c1">-- 3.2 Parse bodyLen (2 bytes)&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="kd">local&lt;/span> &lt;span class="n">bodyLen_field&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">buffer&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">offset&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="mi">2&lt;/span>&lt;span class="p">)&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="kd">local&lt;/span> &lt;span class="n">bodyLen_val&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">bodyLen_field&lt;/span>&lt;span class="p">:&lt;/span>&lt;span class="n">uint&lt;/span>&lt;span class="p">()&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">subtree&lt;/span>&lt;span class="p">:&lt;/span>&lt;span class="n">add&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">f_bodyLen&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">bodyLen_field&lt;/span>&lt;span class="p">)&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">offset&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">offset&lt;/span> &lt;span class="o">+&lt;/span> &lt;span class="mi">2&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="c1">-- 3.3 Check if full JSON payload is available&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="kr">if&lt;/span> &lt;span class="n">buffer&lt;/span>&lt;span class="p">:&lt;/span>&lt;span class="n">len&lt;/span>&lt;span class="p">()&lt;/span> &lt;span class="o">&amp;lt;&lt;/span> &lt;span class="n">offset&lt;/span> &lt;span class="o">+&lt;/span> &lt;span class="n">bodyLen_val&lt;/span> &lt;span class="kr">then&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="c1">-- If not enough bytes, mark it as malformed/truncated&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">subtree&lt;/span>&lt;span class="p">:&lt;/span>&lt;span class="n">add_expert_info&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">PI_MALFORMED&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">PI_ERROR&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="s2">&amp;#34;Packet too short for advertised bodyLen&amp;#34;&lt;/span>&lt;span class="p">)&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="kr">return&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="kr">end&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="c1">-- 3.4 Extract the JSON string bytes, interpret as ASCII/UTF-8&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="kd">local&lt;/span> &lt;span class="n">json_field&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">buffer&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">offset&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">bodyLen_val&lt;/span>&lt;span class="p">)&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="c1">-- We use :string() so that Wireshark will display it as text&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">subtree&lt;/span>&lt;span class="p">:&lt;/span>&lt;span class="n">add&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">f_jsonStr&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">json_field&lt;/span>&lt;span class="p">)&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">offset&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">offset&lt;/span> &lt;span class="o">+&lt;/span> &lt;span class="n">bodyLen_val&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="c1">-- (Optional) If you want to pretty-print or validate JSON,&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="c1">-- you could attempt to parse it here or use a heuristic.&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="c1">-- But for most purposes, displaying the raw string is enough.&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="kr">end&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="c1">-- 4. Register the dissector on a specific TCP port (e.g. 12345).&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="c1">-- Change “12345” to whatever port your protocol actually uses, or&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="c1">-- alternatively hook into a heuristic/UDP/etc. as desired.&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="kd">local&lt;/span> &lt;span class="n">tcp_port&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">DissectorTable.get&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="s2">&amp;#34;tcp.port&amp;#34;&lt;/span>&lt;span class="p">)&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="n">tcp_port&lt;/span>&lt;span class="p">:&lt;/span>&lt;span class="n">add&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="mi">12345&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">sample&lt;/span>&lt;span class="p">)&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="c1">-- If your protocol is over UDP, swap the last two lines with:&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="c1">-- local udp_port = DissectorTable.get(&amp;#34;udp.port&amp;#34;)&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="c1">-- udp_port:add(12345, sample)&lt;/span>
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;p>保存为 &lt;code>sample.lua&lt;/code> 并放入 Wireshark 插件目录中（如 &lt;code>~/.config/wireshark/plugins/&lt;/code>，或window中&lt;code> C:\Program Files\Wireshark\plugins\&amp;lt;version&amp;gt;\&lt;/code>），重新打开 Wireshark 即可。&lt;/p>
+&lt;p>&lt;img src="https://xinchentechnote.github.io/note/note/images/with-lua-plugin.png"
+loading="lazy"
+alt="加载插件后"
+>&lt;/p>
+&lt;h2 id="-步骤-4可选使用-tcpdump-抓包到-pcap-文件">🥪 步骤 4（可选）：使用 &lt;code>tcpdump&lt;/code> 抓包到 &lt;code>.pcap&lt;/code> 文件
+&lt;/h2>&lt;p>如果你希望在终端中进行抓包或生成 &lt;code>.pcap&lt;/code> 文件用于后续分析，可以在 &lt;strong>Windows 主机上安装 WinDump（tcpdump 的 Windows 版本）&lt;/strong>：&lt;/p>
+&lt;ol>
+&lt;li>
+&lt;p>安装 &lt;a class="link" href="https://nmap.org/npcap/" target="_blank" rel="noopener"
+>Npcap&lt;/a>&lt;/p>
+&lt;/li>
+&lt;li>
+&lt;p>安装 &lt;a class="link" href="https://www.winpcap.org/windump/" target="_blank" rel="noopener"
+>WinDump&lt;/a>&lt;/p>
+&lt;/li>
+&lt;li>
+&lt;p>查看接口列表：&lt;/p>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt">1
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-bash" data-lang="bash">&lt;span class="line">&lt;span class="cl">windump -D
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;/li>
+&lt;li>
+&lt;p>选择正确接口编号，开始抓包：&lt;/p>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt">1
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-bash" data-lang="bash">&lt;span class="line">&lt;span class="cl">windump -i &lt;span class="m">3&lt;/span> tcp port &lt;span class="m">12345&lt;/span> -w test.pcap
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;/li>
+&lt;li>
+&lt;p>使用 Wireshark 打开 &lt;code>test.pcap&lt;/code> 文件进行分析。&lt;/p>
+&lt;/li>
+&lt;/ol>
+&lt;hr>
+&lt;h2 id="-总结">✅ 总结
+&lt;/h2>&lt;p>通过以上方式，我们完成了以下目标：&lt;/p>
+&lt;ul>
+&lt;li>✅ 构造自定义协议的二进制数据&lt;/li>
+&lt;li>✅ 使用 &lt;code>nc&lt;/code> 模拟客户端及服务端发送数据&lt;/li>
+&lt;li>✅ 使用 Wireshark 和 tcpdump 抓包&lt;/li>
+&lt;li>✅ 编写 Lua 脚本进行协议解析&lt;/li>
+&lt;/ul>
+&lt;p>这种方法适合调试任何基于 TCP/UDP 的自定义协议，非常适合开发和测试场景。&lt;/p>
+&lt;hr>
+&lt;p>如果你也在调试自己的私有协议，不妨用这个流程走一遍！希望对你有帮助 😎&lt;/p></description></item></channel></rss>
