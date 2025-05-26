@@ -1,1 +1,1 @@
-hugo server --baseURL="http://localhost:1313/note/" --bind=0.0.0.0 --disableFastRender
+hugo server --baseURL="http://localhost:1313/note/" -D --bind=0.0.0.0 --disableFastRender
